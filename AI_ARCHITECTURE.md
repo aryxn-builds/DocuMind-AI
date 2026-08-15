@@ -117,18 +117,18 @@ ProviderConfig
 | Local/private | ❌ | ❌ | ✅ |
 | Cost | Free tier | Free tier | Free (self-hosted) |
 
-**DECIDED:** Groq, Gemini, and Ollama as initial providers.
+**DECIDED:** Groq (primary), Gemini (fallback/vision). Ollama is an optional local fallback and not a mandatory dependency.
 
 ### 2.4 Routing Strategy
 
-**PROPOSED:** Capability-based routing with manual override.
+**DECIDED:** Capability-based routing rules.
 
 ```mermaid
 flowchart TD
     A[Incoming AI request] --> B{Task type?}
-    B -->|Text Q&A| C[Route to default text provider<br/>PROPOSED: Groq]
-    B -->|Vision/multimodal| D[Route to vision provider<br/>PROPOSED: Gemini]
-    B -->|Embeddings| E[Route to embedding model<br/>PROPOSED: Local]
+    B -->|Text Q&A| C[Route to default text provider<br/>DECIDED: Groq]
+    B -->|Vision/multimodal| D[Route to vision provider<br/>DECIDED: Gemini]
+    B -->|Embeddings| E[Route to embedding model<br/>DECIDED: Local]
     B -->|Long document| F[Route to long-context provider]
 
     C --> G{Provider available?}
@@ -141,15 +141,13 @@ flowchart TD
     J -->|No| K[Return error to user]
 ```
 
-**OPEN DECISION:** Exact routing rules (static config, per-task routing, user-selectable models). Static config with capability-based fallback is proposed for MVP.
-
 ---
 
 ## 3. Embedding Pipeline
 
 ### 3.1 Embedding Model
 
-**PROPOSED:** BGE-based model from Sentence Transformers library, run locally.
+**DECIDED:** BGE-based model family from Sentence Transformers library, run locally behind an embedding abstraction.
 
 | Consideration | Decision |
 |---------------|----------|
@@ -159,12 +157,10 @@ flowchart TD
 | Dimension | Model-dependent (typically 384–1024) |
 | Cost | Free (local inference) |
 
-Candidate models:
-- `BAAI/bge-small-en-v1.5` — 384 dim, fast, good for MVP
-- `BAAI/bge-base-en-v1.5` — 768 dim, better quality
-- `BAAI/bge-large-en-v1.5` — 1024 dim, best quality, more compute
+Recommended starting point:
+- `BAAI/bge-small-en-v1.5` — 384 dim, fast, good for MVP. If quality is insufficient, evaluate `bge-base`.
 
-**OPEN DECISION:** Specific embedding model. Recommendation: start with `bge-base-en-v1.5` for balance of quality and speed.
+**DECIDED:** Exact model is an implementation decision. Model family is locked.
 
 ### 3.2 Embedding Process
 
@@ -210,11 +206,7 @@ flowchart TD
 
 **DECIDED:** Vision models generate text descriptions that are then embedded as regular text chunks. This ensures visual content is searchable via the same RAG pipeline.
 
-**OPEN DECISION:** Vision model selection:
-- **Gemini** (cloud, high quality, free tier)
-- **Open-source VLM via Ollama** (local, private, e.g., LLaVA, Moondream)
-
-**PROPOSED:** Gemini for vision during MVP (simplicity, quality). Ollama-based VLM as future local alternative.
+**DECIDED:** Gemini for vision during MVP (simplicity, quality). Ollama-based VLM as future local alternative.
 
 ---
 
@@ -239,7 +231,7 @@ After initial vector retrieval, optionally rerank results using a cross-encoder 
 | No reranking (MVP) | — | Faster, simpler, slightly lower precision |
 | Cross-encoder reranking (P1) | `cross-encoder/ms-marco-MiniLM-L-6-v2` or similar | Better precision, adds latency |
 
-**OPEN DECISION:** Whether to include reranking in MVP or defer to P1.
+**DECIDED (DEFERRED):** Cross-encoder reranking is deferred to P1. Not included in MVP.
 
 ### 5.3 Hybrid Search (PROPOSED for future)
 
@@ -423,13 +415,13 @@ flowchart TD
 |----------|----------|-----------|
 | 1 | Groq | Fast, primary for text Q&A |
 | 2 | Gemini | Good quality, multimodal support |
-| 3 | Ollama | Always available (local), no API dependency |
+| 3 | Ollama | Optional local fallback, no API dependency |
 
 For vision tasks:
 | Priority | Provider | Rationale |
 |----------|----------|-----------|
 | 1 | Gemini | Best multimodal quality |
-| 2 | Ollama (VLM) | Local fallback |
+| 2 | Ollama (VLM) | Optional local fallback |
 
 **DECIDED:** Fallback is automatic and transparent to the user. The response metadata includes which provider was used.
 
@@ -483,12 +475,7 @@ flowchart TD
 
 | ID | Decision | Status |
 |----|----------|--------|
-| OD-AI-01 | Exact routing rules for AI Gateway | PROPOSED: capability-based |
-| OD-AI-02 | Specific embedding model | PROPOSED: bge-base-en-v1.5 |
-| OD-AI-03 | Vision model (Gemini vs. open-source VLM) | PROPOSED: Gemini for MVP |
-| OD-AI-04 | Reranking in MVP or P1 | OPEN DECISION |
 | OD-AI-05 | Hybrid search (vector + BM25) | OPEN DECISION, deferred |
 | OD-AI-06 | System prompt final wording | OPEN DECISION, iterative |
 | OD-AI-07 | Retrieval score threshold for declining to answer | OPEN DECISION, needs tuning |
 | OD-AI-08 | Chunking strategy | OPEN DECISION (see ARCHITECTURE.md) |
-| OD-AI-09 | Streaming support in MVP | OPEN DECISION |

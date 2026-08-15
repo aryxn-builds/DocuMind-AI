@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   DocuMind AI — Global Design System Tokens
+   Source of truth: design-system/MASTER.md
+   ========================================================================== */
+
+@theme inline {
+  /* Fonts — loaded via next/font in layout.tsx */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+:root {
+  /* ------------------------------------------------------------------
+     Color tokens (dark mode default, per design-system/MASTER.md)
+     ------------------------------------------------------------------ */
+
+  /* Surfaces */
+  --bg-base:       #000000;
+  --bg-surface:    #0A0A0A;
+  --bg-elevated:   #111111;
+  --bg-floating:   #171717;
+
+  /* Borders */
+  --border-subtle: #262626;
+  --border-strong: #404040;
+
+  /* Text */
+  --text-primary:   #FFFFFF;
+  --text-secondary: #A3A3A3;
+  --text-muted:     #737373;
+
+  /* Accent */
+  --accent-primary: #FFFFFF;
+
+  /* Status (semantic only — not decorative) */
+  --status-error:   #DC2626;
+  --status-warning: #F59E0B;
+  --status-success: #10B981;
+  --status-process: #3B82F6;
+
+  /* ------------------------------------------------------------------
+     Spacing (4px/8px scale)
+     ------------------------------------------------------------------ */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* ------------------------------------------------------------------
+     Border radius
+     ------------------------------------------------------------------ */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ------------------------------------------------------------------
+     Typography scale
+     ------------------------------------------------------------------ */
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+
+  /* ------------------------------------------------------------------
+     Elevation (subtle shadows, not drop-shadows)
+     ------------------------------------------------------------------ */
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5);
+}
+
+/* ==========================================================================
+   Base styles
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+/* Monospace elements default to JetBrains Mono */
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+/* Remove default list styles in nav contexts */
+nav ul,
+nav ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Focus ring — visible, keyboard-only */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbar — subtle, matching dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--border-strong);
+  color: var(--text-primary);
+}

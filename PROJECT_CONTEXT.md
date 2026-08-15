@@ -4,7 +4,7 @@
 
 - **Product name:** DocuMind AI
 - **Product type:** Multimodal Document Intelligence Web Application / SaaS Platform
-- **Current development stage:** Documentation & Design Definition Phase (No application code written yet)
+- **Current development stage:** Project scaffolding complete. Product functionality is not implemented yet.
 - **One-sentence description:** DocuMind AI is a single, premium workspace where any document can be uploaded, understood multimodally, and queried with AI — with every answer traceable back to source evidence.
 
 ---
@@ -89,7 +89,7 @@ DocuMind AI transforms how knowledge workers interact with their documents. User
 |---|---|---|---|---|
 | Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui | DECIDED | UI, interactions, auth state | ARCHITECTURE.md |
 | Backend | FastAPI, Python | DECIDED | API, RAG pipeline, orchestration | ARCHITECTURE.md |
-| Background Workers | Celery, Redis | DECIDED | Async processing, embeddings | ARCHITECTURE.md |
+| Background Workers | FastAPI BackgroundTasks | DECIDED | Async processing, embeddings (MVP) | ARCHITECTURE.md |
 | Authentication | Supabase Auth (JWT) | DECIDED | User auth, session management | ARCHITECTURE.md |
 | Database | Supabase PostgreSQL | DECIDED | Users, metadata, conversations | ARCHITECTURE.md |
 | Vector Database | Qdrant | DECIDED | Embeddings, semantic search | ARCHITECTURE.md |
@@ -97,8 +97,8 @@ DocuMind AI transforms how knowledge workers interact with their documents. User
 | OCR | RapidOCR / Tesseract | OPEN / UNCLEAR | Process scanned images | PRODUCT_SPEC.md |
 | AI Gateway | Custom Python abstraction | DECIDED | Provider routing | AI_ARCHITECTURE.md |
 | LLM | Groq, Gemini, Ollama | DECIDED | Text generation, Q&A | AI_ARCHITECTURE.md |
-| Multimodal AI | Gemini (MVP) | PROPOSED | Vision tasks, chart understanding | AI_ARCHITECTURE.md |
-| Embeddings | BGE (bge-base-en-v1.5) | PROPOSED | Chunk embeddings | AI_ARCHITECTURE.md |
+| Multimodal AI | Gemini (MVP) | DECIDED | Vision tasks, chart understanding | AI_ARCHITECTURE.md |
+| Embeddings | BGE (bge-base-en-v1.5) | DECIDED | Chunk embeddings | AI_ARCHITECTURE.md |
 | Storage | Supabase Storage | DECIDED | Original uploaded documents | ARCHITECTURE.md |
 | Observability | Langfuse | DECIDED | LLM tracing | ARCHITECTURE.md |
 | Testing | Pytest (Backend) / Jest or Playwright (Frontend) | OPEN / UNCLEAR | Unit/E2E testing | AGENTS.md |
@@ -110,7 +110,7 @@ DocuMind AI transforms how knowledge workers interact with their documents. User
 
 DocuMind AI is a decoupled full-stack application. The Next.js frontend communicates exclusively via a REST API to a Python FastAPI backend, except for authentication, which interacts directly with Supabase Auth using the client SDK.
 
-The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL, manages metadata, and orchestrates tasks. Heavy lifting (document extraction, chunking, embedding) is offloaded to background Celery workers. Vector embeddings are stored in Qdrant, and original files reside in Supabase Storage. LLM requests go through a custom AI Gateway abstraction layer for routing (Groq, Gemini, Ollama) and tracing (Langfuse).
+The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL, manages metadata, and orchestrates tasks. Heavy lifting (document extraction, chunking, embedding) is offloaded to FastAPI BackgroundTasks for the MVP. Vector embeddings are stored in Qdrant, and original files reside in Supabase Storage. LLM requests go through a custom AI Gateway abstraction layer for routing (Groq, Gemini, Ollama) and tracing (Langfuse).
 
 ---
 
@@ -131,7 +131,7 @@ The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL,
 
 - **AI Gateway:** Custom Python abstraction that routes requests across multiple providers, handling retries, fallback chains, and Langfuse tracing.
 - **LLM providers:** Groq (primary for fast text), Gemini (multimodal), Ollama (local/private fallback).
-- **Model routing:** Capability-based routing is PROPOSED (e.g., text vs vision).
+- **Model routing:** Capability-based routing is DECIDED (e.g., text vs vision).
 - **Multimodal processing:** Vision models convert images/charts to text descriptions during ingestion so they can be embedded normally.
 - **Document understanding:** Docling extracts text/tables. Scanned docs use OCR.
 - **Embeddings:** Local BGE-based model from Sentence Transformers.
@@ -178,31 +178,31 @@ The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL,
 ## 12. Important Product & Architecture Decisions
 
 ### DECIDED
-- Application uses Next.js, Tailwind, shadcn/ui, FastAPI, Celery, Supabase (PostgreSQL, Auth, Storage), and Qdrant.
-- All LLM calls pass through a custom AI Gateway.
+- Application uses Next.js, Tailwind, shadcn/ui, FastAPI, Supabase (PostgreSQL, Auth, Storage), and Qdrant. FastAPI BackgroundTasks is used instead of Celery/Redis for MVP.
+- All LLM calls pass through a custom AI Gateway. Text generation uses Groq primary, Gemini fallback. Vision uses Gemini.
+- BGE embedding model family via Sentence Transformers.
 - Supabase JWT validation is enforced on all API routes (except health).
+- API routes are versioned under `/api/v1/...`
+- Chat streaming uses SSE for MVP.
 - Row Level Security (RLS) is required on all PostgreSQL tables.
-- Qdrant searches MUST filter by `user_id`.
+- Qdrant uses a single collection and searches MUST filter by `user_id`.
 - The frontend does not talk to LLMs or Qdrant directly.
 - The visual design system is Premium Monochrome (Inter + JetBrains Mono).
 - Citations must be structurally validated by the backend before returning to the user.
 - Health monitoring endpoints are for legitimate operational monitoring, not for bypassing cloud provider inactivity policies.
+- Maximum individual document upload size is 25 MB for MVP.
+- Upload atomicity is handled by backend-orchestrated flow (Option A).
+- Reranking is DEFERRED to P1.
 
 ### PROPOSED
-- Single Qdrant collection with payload-based filtering (instead of per-user collections).
-- Gemini for MVP vision tasks; Ollama VLM as a future alternative.
-- Local BGE embedding model (`bge-base-en-v1.5`).
 - Capability-based routing rules in the AI Gateway.
 - Docker Compose for initial deployment.
 - Rate limiting at the API layer via Redis.
 
 ### OPEN / UNCLEAR
 - **OCR Engine:** RapidOCR vs Tesseract.
-- **Reranking:** Cross-encoder reranking included in MVP vs deferred to P1.
 - **Chunking Strategy:** Fixed-size vs semantic vs hybrid.
-- **Streaming:** Whether to support SSE streaming for chat responses in MVP.
 - **Production Deployment Target:** VPS vs cloud VM vs serverless.
-- **Maximum File Upload Size.**
 - **LLM Cost Model:** Viability of free tiers for production load.
 - **Frontend Testing Framework:** Jest vs Playwright vs Vitest.
 
@@ -270,22 +270,42 @@ Legitimate operational health-monitoring is planned via `/health` (liveness) and
 - User Flows and Evaluation Framework.
 - Design System definition (Premium Monochrome).
 
-### Planned
-- Complete frontend UI development based on the defined design system.
-- Backend API and RAG pipeline implementation.
+### Completed
+- Full documentation and architecture (PRODUCT_SPEC, ARCHITECTURE, DATABASE_SCHEMA, AI_ARCHITECTURE, API_SPEC, SECURITY, USER_FLOWS, DESIGN_SYSTEM, AGENTS, EVALUATION).
+- Design system definition (Premium Monochrome, design-system/MASTER.md).
+- All pre-implementation architectural decisions locked (DEC-001 through DEC-010, see docs/DECISION_LOG.md).
+- **Project scaffolding:**
+  - Repository monorepo structure (apps/web, apps/api, packages/shared, infra, supabase, docs)
+  - Next.js 16 frontend shell (TypeScript, Tailwind v4, App Router, design system CSS tokens)
+  - FastAPI backend shell (/health, /ready, /api/v1/ping endpoints, typed Settings, CORS)
+  - Docker Compose (Qdrant only — no Redis, no Celery)
+  - Root .env.example, .gitignore, README.md
+  - supabase/migrations/ placeholder
+  - packages/shared/ placeholder
 
 ### Not Started
-- No frontend application code (Next.js, Tailwind) has been written.
-- No backend code (FastAPI, Celery, AI Gateway) has been written.
-- No infrastructure (Docker Compose, Supabase tables) has been provisioned.
+- Authentication (Supabase Auth integration)
+- Database schema migrations (Supabase PostgreSQL)
+- Document upload and ingestion pipeline
+- Docling text/table extraction
+- OCR pipeline
+- Chunking and embedding generation
+- Qdrant indexing and retrieval
+- RAG pipeline
+- Chat with citations
+- AI Gateway implementation
+- Langfuse observability
+- Full frontend UI (dashboard, document viewer, chat UI)
 
 ---
 
 ## 18. Current Development Position
 
-We have finished the documentation and design definition phase. All core structural, architectural, and visual decisions for DocuMind AI are documented. 
+Project scaffolding is complete. The monorepo structure, frontend shell, backend shell, health endpoints, and local development infrastructure are in place.
 
-Next step requires explicit confirmation. (Frontend scaffolding or Backend database initialization is likely next).
+The next development phase is: **Authentication & Database** — Supabase Auth integration and applying the first database migrations.
+
+Do not start authentication without explicit confirmation.
 
 ---
 
@@ -295,33 +315,9 @@ Next step requires explicit confirmation. (Frontend scaffolding or Backend datab
   **Status:** OPEN
   **Files:** `PRODUCT_SPEC.md`
 
-- **Issue:** Whether to include cross-encoder reranking in MVP.
-  **Status:** OPEN
-  **Files:** `AI_ARCHITECTURE.md`
-
-- **Issue:** Should chat responses use SSE streaming in MVP?
-  **Status:** OPEN
-  **Files:** `API_SPEC.md`, `AI_ARCHITECTURE.md`
-
-- **Issue:** Maximum allowed file upload size.
-  **Status:** OPEN
-  **Files:** `PRODUCT_SPEC.md`, `API_SPEC.md`, `SECURITY.md`
-
 - **Issue:** Exact frontend testing framework (Jest, Playwright, or Vitest).
   **Status:** OPEN
   **Files:** `AGENTS.md`
-
-- **Issue (OD-01):** Celery + Redis vs. FastAPI BackgroundTasks for async document processing. Celery adds two additional infrastructure services; BackgroundTasks is sufficient for single-server MVP. Must be decided before any background processing code is written.
-  **Status:** OPEN — must resolve before backend scaffolding
-  **Files:** `ARCHITECTURE.md`
-
-- **Issue (OD-13):** Upload flow atomicity. The current two-step flow (Storage upload → `POST /api/documents` registration) risks orphaned files if the second step fails. Option A (atomic backend-orchestrated flow) or Option B (periodic cleanup) must be chosen before implementing upload.
-  **Status:** OPEN — must resolve before upload implementation
-  **Files:** `ARCHITECTURE.md`, `API_SPEC.md`
-
-- **Issue (OD-15):** API URL versioning. `AGENTS.md` backend structure uses `v1/` path prefix, but `API_SPEC.md` uses `/api` without version. Must be harmonized before any API routes are registered.
-  **Status:** OPEN — must resolve before API implementation
-  **Files:** `AGENTS.md`, `API_SPEC.md`
 
 ---
 

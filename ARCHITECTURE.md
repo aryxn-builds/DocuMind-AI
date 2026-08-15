@@ -65,7 +65,7 @@ graph TB
 |-----------|-----------|----------------|
 | Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui | UI, user interactions, auth state, document viewing |
 | Backend API | FastAPI, Python | Business logic, document processing orchestration, RAG pipeline, API endpoints |
-| Background Workers | Celery, Redis | Async document processing, embedding generation, long-running tasks |
+| Background Workers | FastAPI BackgroundTasks | Async document processing, embedding generation, long-running tasks |
 | Relational Database | Supabase PostgreSQL | Users, documents, conversations, messages, citations, jobs, metadata |
 | Vector Database | Qdrant | Document chunk embeddings, semantic search |
 | File Storage | Supabase Storage | Original uploaded documents |
@@ -105,7 +105,7 @@ The FastAPI backend is responsible for:
 
 - **API layer:** All REST endpoints for documents, conversations, chat, collections
 - **Authentication verification:** Validate Supabase JWT tokens on every request
-- **Document processing orchestration:** Dispatch processing jobs to Celery workers
+- **Document processing orchestration:** Dispatch processing jobs using FastAPI BackgroundTasks behind a replaceable `DocumentProcessor` interface
 - **RAG pipeline:** Query Qdrant, construct context, call AI Gateway, return cited answers
 - **AI Gateway:** Abstract LLM provider selection and call routing
 - **Storage management:** Generate signed URLs, manage file lifecycle
@@ -151,19 +151,20 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[User uploads file] --> B[Frontend validates type + size]
-    B --> C[Frontend uploads to Supabase Storage]
-    C --> D[Frontend calls POST /api/documents]
-    D --> E[Backend creates document record<br/>status: pending]
-    E --> F[Backend dispatches Celery task]
-    F --> G{Celery Worker}
+    A[User uploads file] --> B[Frontend validates type + size (max 25MB)]
+    B --> C[Frontend calls POST /api/v1/documents]
+    C --> D[Backend validates file, atomically creates document record + signed URL]
+    D --> E[Frontend uploads to Supabase Storage using signed URL]
+    E --> F[Frontend notifies backend upload complete]
+    F --> G[Backend verifies file and dispatches BackgroundTask]
+    G --> H{Background Task}
 
-    G --> H[Download file from Storage]
-    H --> I[Detect content type]
-    I --> J{Scanned/Image?}
+    H --> I[Download file from Storage]
+    I --> J[Detect content type]
+    J --> K{Scanned/Image?}
 
-    J -->|Yes| K[Run OCR<br/>RapidOCR / Tesseract]
-    J -->|No| L[Extract text + tables<br/>via Docling]
+    K -->|Yes| L[Run OCR]
+    K -->|No| M[Extract text + tables<br/>via Docling]
     K --> L
 
     L --> M[Chunk document]
@@ -173,31 +174,25 @@ flowchart TD
     P --> Q[Update document status: ready]
     Q --> R[Document available for Q&A]
 
-    G -->|Error| S[Update document status: failed<br/>Store error details]
+    H -->|Error| S[Update document status: failed<br/>Store error details]
 ```
 
 **Processing steps in detail:**
 
-1. **Upload:** File validated client-side (type, size), uploaded to Supabase Storage bucket
-2. **Registration:** Backend creates a `documents` row with `status: pending`
-3. **Dispatch:** Processing task enqueued via Celery/Redis
-4. **Extraction:** Docling extracts text, tables, and structural metadata
-5. **OCR:** If scanned content detected, run OCR pipeline
-6. **Chunking:** Document split into semantically meaningful chunks
-7. **Embedding:** Each chunk embedded using the configured embedding model
-8. **Vector storage:** Embeddings stored in Qdrant with `user_id` and `document_id` metadata
-9. **Relational metadata:** Chunk metadata (page numbers, positions) stored in PostgreSQL
-10. **Completion:** Document status updated to `ready` or `failed`
+1. **Upload Initiation:** File validated client-side (type, size max 25MB). Frontend requests upload URL.
+2. **Atomic Registration (OD-13 Option A):** Backend atomically creates `documents` row (status: `awaiting_upload`) and generates signed URL.
+3. **Upload:** Frontend uploads file to Supabase Storage.
+4. **Dispatch:** Frontend notifies backend of completion. Backend verifies file exists, enqueues processing via FastAPI `BackgroundTasks`.
+5. **Extraction:** Docling extracts text, tables, and structural metadata.
+6. **OCR:** If scanned content detected, run OCR pipeline.
+7. **Chunking:** Document split into semantically meaningful chunks.
+8. **Embedding:** Each chunk embedded using the configured embedding model.
+9. **Vector storage:** Embeddings stored in Qdrant with `user_id` and `document_id` metadata.
+10. **Relational metadata:** Chunk metadata (page numbers, positions) stored in PostgreSQL.
+11. **Completion:** Document status updated to `ready` or `failed`.
 
+**DECIDED (OD-13):** Upload flow uses backend-orchestrated atomic registration (Option A) to prevent orphaned files in Storage.
 **OPEN DECISION:** Exact chunking strategy (fixed-size, semantic, hybrid).
-
-**OPEN DECISION (OD-13) — Upload atomicity:** The two-step upload flow (Storage upload → `POST /api/documents` registration) has an orphaned-file risk: if the registration call fails after the Storage upload succeeds, a file exists in Storage with no database record. It cannot be found, processed, or deleted through normal product flows.
-
-Two mitigation options:
-- **Option A (Recommended):** Backend generates the signed URL *and* atomically creates the `documents` record (status: `awaiting_upload`) before returning the URL. Registration and signed-URL generation are a single backend operation. The worker verifies the file exists before processing.
-- **Option B:** A periodic cleanup task deletes Storage objects older than N hours with no corresponding `documents` record.
-
-This decision must be made before implementing the upload flow.
 
 
 ---
@@ -330,21 +325,13 @@ graph LR
 - **Search:** Filtered by `user_id` and optionally `document_id(s)` on every query
 - **Isolation:** No cross-user retrieval is possible when filters are applied correctly
 
-**PROPOSED:** Single Qdrant collection `document_chunks` with payload-based filtering.
-
-**OPEN DECISION:** Multiple Qdrant collections (per-user or per-document) vs. single collection with filtering. Single collection with metadata filtering is proposed for simplicity at MVP scale.
-
-### 10.4 Redis
-
-- **Purpose:** Celery task broker, optional caching layer
-- **Data:** Task queue messages, processing job status, optional query cache
-- **Persistence:** Not required for task queue (ephemeral). Cache data is expendable.
+**DECIDED:** Single Qdrant collection `document_chunks` with payload-based filtering.
 
 ---
 
 ## 11. Background Jobs Architecture
 
-**DECIDED:** Celery + Redis for async task processing.
+**DECIDED:** FastAPI `BackgroundTasks` via a replaceable `DocumentProcessor` interface for MVP. Celery and Redis are intentionally excluded to minimize operational complexity.
 
 | Job Type | Trigger | Worker Action |
 |----------|---------|---------------|
@@ -355,12 +342,12 @@ graph LR
 
 **Job lifecycle:**
 1. API creates `processing_jobs` record with `status: queued`
-2. Celery task dispatched with job ID
-3. Worker updates status: `queued` → `processing` → `completed` / `failed`
+2. Background task dispatched in FastAPI
+3. Processor updates status: `queued` → `processing` → `completed` / `failed`
 4. Frontend can poll job status via API
 5. Failed jobs store error details for debugging
 
-**OPEN DECISION:** Whether to use WebSocket/SSE for real-time processing status or polling.
+**DECIDED:** Use SSE for chat streaming in MVP. Processing status updates via polling or SSE (TBD).
 
 ---
 
@@ -370,7 +357,6 @@ graph LR
 |---------|---------|-------------|------|
 | Supabase | Auth, PostgreSQL, Storage | Cloud (free tier available) | Free tier for dev |
 | Qdrant | Vector search | Self-hosted via Docker | Free (OSS) |
-| Redis | Task queue | Self-hosted via Docker | Free (OSS) |
 | Groq | LLM inference | Cloud API | Free tier available |
 | Google Gemini | LLM + vision | Cloud API | Free tier available |
 | Ollama | Local LLM | Self-hosted | Free (OSS) |
@@ -384,11 +370,10 @@ graph LR
 |---------|--------|------------|
 | Supabase down | Auth, DB, storage unavailable | Application is unavailable; no self-hosted fallback |
 | Qdrant down | Vector search unavailable | Chat/Q&A fails gracefully; documents still viewable |
-| Redis down | No new processing jobs | Queue recovers on restart; existing jobs may need retry |
 | Groq API down | Primary LLM unavailable | AI Gateway falls back to Gemini or Ollama |
 | Gemini API down | Vision/multimodal unavailable | Degrade to text-only processing; fallback to Groq |
 | Ollama down | Local LLM unavailable | Fall back to cloud providers |
-| Celery worker crash | Processing job fails | Job marked as `failed`; user can retry |
+| BackgroundTask crash | Processing job fails | Job marked as `failed`; user can retry |
 | Langfuse down | No LLM tracing | Non-critical; application continues without observability |
 
 **Design principle:** Failures in the AI/vector layer should degrade gracefully (show error, suggest retry) rather than crash the application. Failures in auth/database are hard dependencies.
@@ -404,9 +389,7 @@ graph TB
     subgraph Docker Compose
         FE["next-frontend<br/>:3000"]
         API["fastapi-backend<br/>:8000"]
-        CW["celery-worker"]
         QD["qdrant<br/>:6333"]
-        RD["redis<br/>:6379"]
         OL["ollama<br/>:11434"]
     end
 
@@ -420,20 +403,13 @@ graph TB
     FE --> API
     API --> SB
     API --> QD
-    API --> RD
     API --> GQ
     API --> GM
     API --> OL
     API --> LF
-    CW --> SB
-    CW --> QD
-    CW --> RD
-    CW --> GQ
-    CW --> GM
-    CW --> OL
 ```
 
-**DECIDED:** Development uses Docker Compose with locally-run Qdrant, Redis, and Ollama alongside cloud services (Supabase, Groq, Gemini).
+**DECIDED:** Development uses Docker Compose with locally-run Qdrant and Ollama alongside cloud services (Supabase, Groq, Gemini).
 
 **OPEN DECISION:** Production deployment target (VPS, cloud VM, container platform, serverless). Deferred until post-MVP.
 
@@ -566,11 +542,7 @@ See `SECURITY.md` §15 for full security requirements for this endpoint.
 | ID | Decision | Status |
 |----|----------|--------|
 | OD-ARCH-01 | Chunking strategy (fixed-size, semantic, hybrid) | OPEN DECISION |
-| OD-ARCH-02 | Reranking model for retrieval | OPEN DECISION |
-| OD-ARCH-03 | Vision model (Gemini vs. open-source VLM) | OPEN DECISION |
 | OD-ARCH-04 | AI Gateway routing rules | OPEN DECISION |
-| OD-ARCH-05 | Qdrant collection strategy (single vs. multiple) | PROPOSED: single |
-| OD-ARCH-06 | Real-time status updates (WebSocket/SSE vs. polling) | OPEN DECISION |
 | OD-ARCH-07 | Production deployment target | OPEN DECISION |
 | OD-ARCH-08 | External monitoring provider (GitHub Actions / uptime service) | OPEN DECISION |
 | OD-ARCH-09 | Health check cadence for production monitoring | OPEN DECISION |

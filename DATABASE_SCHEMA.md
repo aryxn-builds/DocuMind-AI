@@ -104,6 +104,7 @@ erDiagram
     citations {
         uuid id PK
         uuid message_id FK
+        uuid user_id FK
         uuid document_chunk_id FK
         uuid document_id FK
         int page_number
@@ -296,6 +297,7 @@ erDiagram
 |--------|------|-------------|-------------|
 | `id` | `uuid` | PK, DEFAULT gen_random_uuid() | Citation ID |
 | `message_id` | `uuid` | NOT NULL, FK → messages(id) | The AI message containing this citation |
+| `user_id` | `uuid` | NOT NULL, FK → profiles(id) | Owner (denormalized for RLS) |
 | `document_chunk_id` | `uuid` | NOT NULL, FK → document_chunks(id) | Referenced chunk |
 | `document_id` | `uuid` | NOT NULL, FK → documents(id) | Referenced document (denormalized) |
 | `page_number` | `int` | NULLABLE | Page number of the cited content |
@@ -306,16 +308,18 @@ erDiagram
 **Primary Key:** `id`
 **Foreign Keys:**
 - `message_id` → `messages(id)` ON DELETE CASCADE
+- `user_id` → `profiles(id)` ON DELETE CASCADE
 - `document_chunk_id` → `document_chunks(id)` ON DELETE CASCADE
 - `document_id` → `documents(id)` ON DELETE CASCADE
 
 **Indexes:**
 - `idx_citations_message_id` on `(message_id)`
+- `idx_citations_user_id` on `(user_id)`
 - `idx_citations_document_id` on `(document_id)`
 
-**RLS:** Inherits access through `messages` (user can read citations for their own messages). Alternatively, add `user_id` column for direct RLS.
+**RLS:** Users can read/insert only citations where `user_id = auth.uid()`.
 
-**PROPOSED:** Add `user_id` to `citations` for simpler RLS, same denormalization pattern as `document_chunks`.
+**DECIDED:** `user_id` is included in `citations` for simpler RLS, following the same denormalization pattern as `document_chunks`.
 
 ---
 
@@ -430,7 +434,6 @@ For reference, Qdrant stores the following per point:
 
 | ID | Decision | Context |
 |----|----------|---------|
-| OD-DB-01 | Add `user_id` column to `citations` table | PROPOSED for RLS simplicity, but adds more denormalization |
 | OD-DB-02 | Full-text search index on `document_chunks.content_preview` | May want pg_trgm or tsvector for keyword fallback search |
 | OD-DB-03 | Soft delete vs. hard delete for documents | Hard delete with CASCADE is simpler; soft delete preserves audit trail |
 | OD-DB-04 | `messages.metadata` structure | JSONB is flexible; may want to extract key fields later |

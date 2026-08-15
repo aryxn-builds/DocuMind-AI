@@ -61,3 +61,22 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
             raise RuntimeError(f"Embedding generation failed: {e}") from e
+
+    def embed_query(self, text: str) -> List[float]:
+        """
+        Embeds a single query string for search.
+        """
+        if self.model is None:
+            logger.info(f"Loading embedding model: {self.model_name}")
+            try:
+                self.model = SentenceTransformer(self.model_name)
+            except Exception as e:
+                logger.error(f"Failed to load embedding model {self.model_name}: {e}")
+                raise RuntimeError("Embedding model is not loaded.") from e
+        
+        try:
+            embedding = self.model.encode([text], normalize_embeddings=True)[0]
+            return embedding.tolist()
+        except Exception as e:
+            logger.error(f"Failed to generate query embedding: {e}")
+            raise RuntimeError(f"Query embedding generation failed: {e}") from e

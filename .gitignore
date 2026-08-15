@@ -103,3 +103,7 @@ docker-compose.override.yml
 *.db
 *.sqlite3
 *.log
+
+# Temp files
+temp_token.txt
+apps/web/temp_token.txt

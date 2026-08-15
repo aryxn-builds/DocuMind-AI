@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 
 type Document = {
@@ -223,7 +224,15 @@ export function DocumentDashboard() {
                   <td className="px-6 py-4 text-zinc-500 whitespace-nowrap">
                     {new Date(doc.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                    {doc.status === 'ready' && (
+                      <Link 
+                        href={`/dashboard/documents/${doc.id}`}
+                        className="text-zinc-900 hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400 font-medium text-xs border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 bg-white dark:bg-zinc-900"
+                      >
+                        Ask AI
+                      </Link>
+                    )}
                     <button 
                       onClick={() => handleDelete(doc.id)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 font-medium"

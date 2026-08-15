@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
 
 from app.ai.models import NormalizedDocument
 

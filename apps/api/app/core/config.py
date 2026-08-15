@@ -78,6 +78,14 @@ class Settings(BaseSettings):
         default="gemini-1.5-flash",
         description="Gemini model for vision enrichment.",
     )
+    groq_model: str = Field(
+        default="llama-3.1-8b-instant",
+        description="Groq model ID for chat completions.",
+    )
+    gemini_chat_model: str = Field(
+        default="gemini-1.5-flash",
+        description="Gemini model ID for chat completions (fallback LLM).",
+    )
     max_pages: int = Field(default=500, description="Document page limit.")
     max_vision_calls_per_doc: int = Field(default=20, description="Gemini budget per document.")
     processing_timeout_seconds: int = Field(default=300, description="Per-document processing timeout.")

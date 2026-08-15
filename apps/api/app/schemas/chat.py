@@ -54,7 +54,7 @@ class MessageResponse(BaseModel):
 class ConversationCreate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=500)
     document_id: Optional[uuid.UUID] = Field(
-        default=None, 
+        default=None,
         description="If provided, this conversation is scoped to a specific document."
     )
 

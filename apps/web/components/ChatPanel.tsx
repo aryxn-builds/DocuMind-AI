@@ -111,9 +111,21 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                       }
                       return newMessages
                     })
+                  } else if (parsed.error) {
+                    // Backend signalled an error — replace the empty placeholder
+                    // with an informative message so the user sees feedback.
+                    setMessages(prev => {
+                      const newMessages = [...prev]
+                      const last = newMessages[newMessages.length - 1]
+                      if (last.role === 'assistant' && last.content === '') {
+                        last.content = `⚠ ${parsed.error}`
+                      }
+                      return newMessages
+                    })
+                    done = true
                   }
-                } catch (e) {
-                  // ignore incomplete JSON parse
+                } catch {
+                  // ignore incomplete JSON frames
                 }
               }
             }

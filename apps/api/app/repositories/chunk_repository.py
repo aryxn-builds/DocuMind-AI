@@ -15,7 +15,7 @@ def _client() -> Client:
 def insert_chunks(chunks: List[Chunk]):
     if not chunks:
         return
-        
+
     records = []
     for chunk in chunks:
         records.append({
@@ -26,13 +26,14 @@ def insert_chunks(chunks: List[Chunk]):
             "content_preview": chunk.content_preview,
             "chunk_type": chunk.chunk_type,
             "page_number": chunk.page_number,
+            "qdrant_point_id": chunk.chunk_id,
             "position_metadata": {
                 "section_path": chunk.section_path,
                 "bbox": chunk.bbox.__dict__ if chunk.bbox else None,
                 "table_data": chunk.table_data,
             }
         })
-        
+
     try:
         # In production, we'd batch these for very large documents.
         # For Phase 8 MVP, we do it in one shot.
@@ -48,9 +49,26 @@ def delete_by_document(document_id: str, user_id: str):
     """
     if not user_id:
         raise ValueError("user_id is required for chunk deletion.")
-        
+
     try:
         _client().table(TABLE).delete().eq("document_id", document_id).eq("user_id", user_id).execute()
     except Exception as e:
         logger.error(f"Failed to delete chunks for document {document_id}: {e}")
         raise
+
+def get_chunks_by_ids(chunk_ids: List[str], user_id: str) -> List[dict]:
+    """
+    Fetches chunks by their IDs, enforcing user ownership.
+    """
+    if not chunk_ids:
+        return []
+    
+    response = (
+        _client()
+        .table(TABLE)
+        .select("*")
+        .in_("id", chunk_ids)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return response.data or []

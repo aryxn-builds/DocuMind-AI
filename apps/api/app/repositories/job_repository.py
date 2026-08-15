@@ -89,7 +89,7 @@ def claim_job(job_id: str) -> dict | None:
         .eq("status", "queued")
         .execute()
     )
-    
+
     if response.data:
         return response.data[0]
     return None
@@ -128,7 +128,7 @@ def complete_job(job_id: str) -> None:
 def find_stale_processing_jobs(older_than_minutes: int) -> list[dict]:
     """Finds jobs stuck in processing state for longer than the specified minutes."""
     threshold = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
-    
+
     response = (
         _client()
         .table(TABLE)
@@ -143,7 +143,7 @@ def fail_stale_jobs(message: str) -> int:
     """Marks all 'processing' or 'queued' jobs as failed during process startup."""
     now = datetime.now(timezone.utc).isoformat()
     count = 0
-    
+
     for status in ["processing", "queued"]:
         response = (
             _client()
@@ -158,5 +158,5 @@ def fail_stale_jobs(message: str) -> int:
         )
         if response.data:
             count += len(response.data)
-            
+
     return count

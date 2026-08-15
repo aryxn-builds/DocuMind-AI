@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, List
+from typing import List
 
 from supabase import Client, create_client
 
@@ -38,13 +38,13 @@ def create_citations(
             "user_id": user_id,
             "message_id": str(data["message_id"]),
             "document_id": str(data["document_id"]),
-            "chunk_id": str(data["chunk_id"]),
+            "document_chunk_id": str(data["chunk_id"]),
             "page_number": data.get("page_number"),
             "excerpt": data.get("excerpt", ""),
             "relevance_score": data.get("relevance_score", 0.0)
         }
         records.append(record)
-        
+
     response = _client().table(TABLE).insert(records).execute()
     return response.data or []
 

@@ -17,34 +17,34 @@ class VisionEnrichmentService:
         if settings.gemini_api_key:
             genai.configure(api_key=settings.gemini_api_key)
         self.model_name = settings.gemini_vision_model
-        
+
     def enrich(self, document: NormalizedDocument) -> NormalizedDocument:
         if not settings.gemini_api_key:
             logger.warning("No GEMINI_API_KEY set. Skipping vision enrichment.")
             self._fill_placeholders(document)
             return document
-            
+
         model = genai.GenerativeModel(self.model_name)
         calls_made = 0
-        
+
         for block in document.blocks:
             if block.block_type == BlockType.IMAGE and block.image_ref:
                 if calls_made >= settings.max_vision_calls_per_doc:
                     block.content = "[Image: visual content, description unavailable due to budget limit]"
                     continue
-                    
+
                 if block.image_ref.startswith("data:"):
                     try:
                         mime_part, b64_part = block.image_ref.split(";")
                         _, b64_data = b64_part.split(",")
                         mime_type = mime_part.split(":")[1]
-                        
+
                         image_bytes = base64.b64decode(b64_data)
-                        
+
                         retries = 3
                         backoff = 1
                         success = False
-                        
+
                         for attempt in range(retries):
                             try:
                                 # The instruction is a fixed system prompt. The document text is NEVER injected.
@@ -63,7 +63,7 @@ class VisionEnrichmentService:
                                 if attempt < retries - 1:
                                     time.sleep(backoff)
                                     backoff *= 2
-                                    
+
                         if not success:
                             block.content = "[Image: visual content, description unavailable]"
                     except Exception as e:
@@ -71,10 +71,10 @@ class VisionEnrichmentService:
                         block.content = "[Image: unprocessable format]"
                 else:
                     block.content = "[Image: unsupported reference format]"
-                    
+
                 # Optionally clear image_ref to save memory if it's a huge base64 string
                 block.image_ref = None
-                
+
         return document
 
     def _fill_placeholders(self, document: NormalizedDocument):

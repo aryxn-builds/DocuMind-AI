@@ -32,21 +32,27 @@ def create_message(
 ) -> dict:
     """Creates a new message in a conversation. Enforces user_id ownership."""
     message_id = str(uuid.uuid4())
+    metadata = {}
+    if tokens_used is not None:
+        metadata["tokens_used"] = tokens_used
+    if provider is not None:
+        metadata["provider"] = provider
+    if model is not None:
+        metadata["model"] = model
+
     record = {
         "id": message_id,
         "conversation_id": str(conversation_id),
         "user_id": user_id,
         "role": role,
         "content": content,
-        "tokens_used": tokens_used,
-        "provider": provider,
-        "model": model
+        "metadata": metadata if metadata else None
     }
-    
+
     response = _client().table(TABLE).insert(record).execute()
     if not response.data:
         raise RuntimeError("Failed to insert message record")
-        
+
     return response.data[0]
 
 def list_messages_for_conversation(conversation_id: uuid.UUID, user_id: str) -> List[dict]:

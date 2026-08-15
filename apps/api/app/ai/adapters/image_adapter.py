@@ -10,7 +10,7 @@ class ImageAdapter(BaseAdapter):
 
     def parse(self, file_bytes: bytes) -> NormalizedDocument:
         block_id = str(uuid.uuid4())
-        
+
         # Convert the bytes to base64 for embedding in the block
         b64_image = base64.b64encode(file_bytes).decode("utf-8")
         image_ref = f"data:{self.mime_type};base64,{b64_image}"

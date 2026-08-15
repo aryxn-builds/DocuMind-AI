@@ -7,7 +7,6 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Optional, List
 
 from qdrant_client.http import models as qmodels
 
@@ -28,10 +27,10 @@ class RetrievalService:
         Mandatory user_id filter ensures strict multi-tenant isolation.
         """
         start_time = time.time()
-        
+
         # 1. Embed the query
         query_vector = self.embedding_service.embed_query(request.query)
-        
+
         # 2. Build filters
         # MUST include user_id to enforce isolation
         must_conditions = [
@@ -40,7 +39,7 @@ class RetrievalService:
                 match=qmodels.MatchValue(value=user_id)
             )
         ]
-        
+
         if request.document_id:
             must_conditions.append(
                 qmodels.FieldCondition(
@@ -48,26 +47,26 @@ class RetrievalService:
                     match=qmodels.MatchValue(value=str(request.document_id))
                 )
             )
-            
+
         search_filter = qmodels.Filter(must=must_conditions)
-        
+
         # 3. Search Qdrant
         self.qdrant_service._initialize()
         if not self.qdrant_service.client:
             raise RuntimeError("Qdrant client is not available")
-            
-        search_results = self.qdrant_service.client.search(
+
+        search_response = self.qdrant_service.client.query_points(
             collection_name=self.qdrant_service.COLLECTION_NAME,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=search_filter,
             limit=request.top_k,
             score_threshold=request.similarity_threshold,
             with_payload=True
         )
-        
+
         # 4. Normalize results
         results = []
-        for scored_point in search_results:
+        for scored_point in search_response.points:
             payload = scored_point.payload or {}
             result = SearchResult(
                 chunk_id=uuid.UUID(payload.get("chunk_id", str(scored_point.id))),
@@ -78,9 +77,9 @@ class RetrievalService:
                 relevance_score=scored_point.score
             )
             results.append(result)
-            
+
         query_time_ms = (time.time() - start_time) * 1000
-        
+
         return SearchResponse(
             results=results,
             query_time_ms=query_time_ms

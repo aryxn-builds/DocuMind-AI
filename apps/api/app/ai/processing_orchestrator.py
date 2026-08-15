@@ -36,59 +36,59 @@ class ProcessingOrchestrator:
             return
 
         document_repository.update_document_status(document_id, user_id, "processing")
-        
+
         try:
             logger.info(f"Running idempotent cleanup for document {document_id}")
             self.qdrant_service.delete_by_document(document_id, user_id)
             chunk_repository.delete_by_document(document_id, user_id)
-            
-            doc = document_repository.get_document(document_id, user_id)
+
+            doc = document_repository.get_document_by_id(document_id, user_id)
             if not doc:
                 raise ValueError(f"Document {document_id} not found.")
 
             file_path = doc["file_path"]
-            mime_type = doc["mime_type"]
+            mime_type = doc["file_type"]
             title = doc["title"]
-            
+
             job_repository.update_job_progress(job_id, 0.1, "downloading")
-            
+
             file_bytes = storage_service.download_document(file_path)
             if not file_bytes:
                 raise RuntimeError("Empty file downloaded.")
-                
+
             job_repository.update_job_progress(job_id, 0.2, "parsing")
-            
+
             adapter = get_adapter(document_id, user_id, file_path, mime_type, title)
             normalized_doc = adapter.parse(file_bytes)
-            
+
             document_repository.update_document_metadata(document_id, user_id, {"page_count": normalized_doc.page_count, "processing_metadata": normalized_doc.processing_metadata})
-            
+
             if normalized_doc.page_count > settings.max_pages:
                 raise ValueError(f"Document exceeds max page limit ({normalized_doc.page_count} > {settings.max_pages})")
-                
+
             job_repository.update_job_progress(job_id, 0.4, "enriching")
-            
+
             normalized_doc = self.vision_service.enrich(normalized_doc)
-            
+
             job_repository.update_job_progress(job_id, 0.6, "chunking")
-            
+
             chunks = self.chunker.chunk(normalized_doc)
             if not chunks:
                 raise ValueError("No processable content found in document.")
-                
+
             job_repository.update_job_progress(job_id, 0.7, "embedding")
-            
+
             chunks_with_vectors = self.embedding_service.embed(chunks)
-            
+
             job_repository.update_job_progress(job_id, 0.8, "indexing")
-            
+
             # CONSISTENCY PROTOCOL: Qdrant first, PostgreSQL second, Rollback on failure.
             try:
                 self.qdrant_service.upsert(chunks_with_vectors, user_id)
             except Exception as e:
                 logger.error(f"Qdrant indexing failed for {document_id}: {e}")
                 raise RuntimeError("Failed to index vectors in Qdrant") from e
-                
+
             try:
                 chunk_repository.insert_chunks(chunks)
             except Exception as e:
@@ -102,7 +102,7 @@ class ProcessingOrchestrator:
 
             job_repository.complete_job(job_id)
             document_repository.update_document_status(document_id, user_id, "ready")
-            
+
             logger.info(f"Successfully processed document {document_id}")
 
         except Exception as e:

@@ -14,25 +14,25 @@ class Chunker:
     def chunk(self, document: NormalizedDocument) -> List[Chunk]:
         chunks: List[Chunk] = []
         chunk_index = 0
-        
+
         current_heading_prefix = ""
         current_text_buffer = ""
         current_block_ids = []
         current_bbox = None
         current_page = None
         current_section = []
-        
+
         def commit_text_buffer():
             nonlocal chunk_index, current_text_buffer, current_block_ids, current_bbox, current_page, current_section
             if not current_text_buffer:
                 return
-                
+
             content = current_text_buffer.strip()
-            
+
             if len(content) > self.TARGET_CHUNK_CHARS:
                 # Split at sentence boundaries
                 sentences = re.split(r'(?<=[.!?])\s+', content)
-                
+
                 temp_content = ""
                 for i, sentence in enumerate(sentences):
                     if len(temp_content) + len(sentence) > self.TARGET_CHUNK_CHARS and len(temp_content) >= self.MIN_CHUNK_CHARS:
@@ -41,16 +41,16 @@ class Chunker:
                             current_page, current_section, current_bbox, current_block_ids
                         ))
                         chunk_index += 1
-                        
+
                         # Overlap: keep last N sentences
                         overlap_sentences = sentences[max(0, i - self.OVERLAP_SENTENCES):i]
                         overlap = " ".join(overlap_sentences)
-                        
+
                         prefix = current_heading_prefix if current_heading_prefix else ""
                         temp_content = prefix + overlap + " " + sentence if overlap else prefix + sentence
                     else:
                         temp_content += " " + sentence if temp_content else sentence
-                
+
                 if len(temp_content.strip()) >= self.MIN_CHUNK_CHARS:
                     chunks.append(self._create_chunk(
                         document, chunk_index, BlockType.TEXT.value, temp_content.strip(),
@@ -67,25 +67,25 @@ class Chunker:
 
             current_text_buffer = ""
             current_block_ids = []
-            
+
         for block in document.blocks:
             if block.block_type == BlockType.HEADING:
                 commit_text_buffer()
                 current_heading_prefix = block.content.strip() + "\n\n"
-                
+
             elif block.block_type in (BlockType.TEXT, BlockType.LIST, BlockType.CAPTION):
                 if current_text_buffer and len(current_text_buffer) + len(block.content) > self.TARGET_CHUNK_CHARS:
                     commit_text_buffer()
-                    
+
                 if not current_text_buffer:
                     current_text_buffer = current_heading_prefix
                     current_bbox = block.bbox
                     current_page = block.page_number
                     current_section = block.section_path
-                
+
                 current_text_buffer += block.content + " "
                 current_block_ids.append(block.block_id)
-                
+
             elif block.block_type == BlockType.TABLE:
                 commit_text_buffer()
                 content = current_heading_prefix + block.content.strip()
@@ -96,7 +96,7 @@ class Chunker:
                 ))
                 chunk_index += 1
                 current_heading_prefix = ""
-                
+
             elif block.block_type == BlockType.IMAGE:
                 commit_text_buffer()
                 content = block.content.strip()
@@ -106,7 +106,7 @@ class Chunker:
                 ))
                 chunk_index += 1
                 current_heading_prefix = ""
-                
+
         commit_text_buffer()
         return chunks
 
@@ -114,7 +114,7 @@ class Chunker:
         # Enforce hard limit
         if len(content) > self.MAX_CHUNK_CHARS:
             content = content[:self.MAX_CHUNK_CHARS - 3] + "..."
-            
+
         return Chunk(
             chunk_id=str(uuid.uuid4()),
             document_id=doc.document_id,

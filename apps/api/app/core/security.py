@@ -45,6 +45,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             algorithms=["RS256", "ES256"],
             audience="authenticated",
             issuer=expected_issuer,
+            leeway=60,
             options={"verify_exp": True}
         )
 

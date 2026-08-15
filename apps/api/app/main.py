@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Marked {count} stale jobs as failed during startup.")
     except Exception as e:
         logger.error(f"Failed to run stale job sweep: {e}")
-        
+
     yield
     # Shutdown
 

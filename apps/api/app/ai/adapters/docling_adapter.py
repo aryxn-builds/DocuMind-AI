@@ -1,5 +1,8 @@
 import tempfile
 import os
+
+os.environ["TORCHDYNAMO_DISABLE"] = "1"
+
 import uuid
 import logging
 from typing import List
@@ -11,7 +14,6 @@ except ImportError:
 
 from app.ai.models import NormalizedDocument, DocumentBlock, BlockType, BoundingBox
 from app.ai.adapters.base import BaseAdapter
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ class DoclingAdapter(BaseAdapter):
             # We use iterate_items() to traverse the document in reading order
             for item, level in doc.iterate_items():
                 label = getattr(item, "label", "text")
-                
+
                 if label in ["text", "paragraph"]:
                     block_type = BlockType.TEXT
                 elif label == "section_header":

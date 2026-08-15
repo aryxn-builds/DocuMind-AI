@@ -102,6 +102,23 @@ def update_document_status(
     return response.data[0] if response.data else None
 
 
+def update_document_metadata(
+    document_id: uuid.UUID,
+    user_id: str,
+    metadata: dict,
+) -> dict | None:
+    """Updates the metadata columns of a document (e.g. page_count, processing_metadata)."""
+    response = (
+        _client()
+        .table(TABLE)
+        .update(metadata)
+        .eq("id", str(document_id))
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
 def list_documents(
     user_id: str,
     status_filter: str | None = None,

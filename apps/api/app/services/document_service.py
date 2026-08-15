@@ -121,15 +121,15 @@ def get_document_status(user_id: str, document_id: uuid.UUID) -> DocumentStatusR
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
         )
-        
+
     job = job_repository.get_job_by_document(document_id, user_id)
     progress = 0.0
     error_details = None
-    
+
     if job:
         progress = job.get("progress") or 0.0
         error_details = job.get("error_details")
-        
+
     return DocumentStatusResponse(
         status=doc["status"],
         progress=progress,
@@ -139,7 +139,7 @@ def get_document_status(user_id: str, document_id: uuid.UUID) -> DocumentStatusR
 # ...
 
 def register_document(
-    user_id: str, 
+    user_id: str,
     request: DocumentRegisterRequest,
     background_tasks: BackgroundTasks
 ) -> DocumentRegisterResponse:

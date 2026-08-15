@@ -74,14 +74,18 @@ def test_get_me_invalid_token():
     assert "detail" in response.json()
 
 @patch("app.core.security.jwks_client")
-def test_valid_es256_token(mock_jwks_client):
+@patch("app.core.security.settings")
+def test_valid_es256_token(mock_settings, mock_jwks_client):
+    mock_settings.supabase_url = "https://mock.supabase.co"
     mock_jwks_client.get_signing_key_from_jwt.return_value = create_mock_jwk(ec_public_key, "ES256")
     token = generate_token(ec_private_key, "ES256")
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
 
 @patch("app.core.security.jwks_client")
-def test_valid_rs256_token(mock_jwks_client):
+@patch("app.core.security.settings")
+def test_valid_rs256_token(mock_settings, mock_jwks_client):
+    mock_settings.supabase_url = "https://mock.supabase.co"
     mock_jwks_client.get_signing_key_from_jwt.return_value = create_mock_jwk(rsa_public_key, "RS256")
     token = generate_token(rsa_private_key, "RS256")
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})

@@ -21,11 +21,11 @@ class NullTracer:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwds):
                 return func(*args, **kwds)
-                
+
             @functools.wraps(func)
             async def async_wrapper(*args, **kwds):
                 return await func(*args, **kwds)
-                
+
             if inspect.iscoroutinefunction(func):
                 return async_wrapper
             return sync_wrapper
@@ -36,16 +36,16 @@ class _TracerFactory:
         self.langfuse = None
         self._initialized = False
         self._initialize()
-        
+
     def _initialize(self):
         if self._initialized:
             return
-            
+
         self._initialized = True
-        
+
         if settings.langfuse_public_key and settings.langfuse_secret_key and settings.langfuse_host:
             try:
-                # We simply instantiate to verify credentials are ok, 
+                # We simply instantiate to verify credentials are ok,
                 # but the @observe decorator uses environment variables natively
                 self.langfuse = Langfuse(
                     public_key=settings.langfuse_public_key,
@@ -58,7 +58,7 @@ class _TracerFactory:
                 self.langfuse = None
         else:
             logger.info("Langfuse credentials not fully set. Using NullTracer.")
-            
+
     @property
     def observe(self) -> Callable:
         if self.langfuse and observe:

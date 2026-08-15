@@ -34,11 +34,11 @@ def create_conversation(
         "title": title,
         "document_id": str(document_id) if document_id else None
     }
-    
+
     response = _client().table(TABLE).insert(record).execute()
     if not response.data:
         raise RuntimeError("Failed to insert conversation record")
-        
+
     return response.data[0]
 
 def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> Optional[dict]:
@@ -52,7 +52,9 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> Optional
         .maybe_single()
         .execute()
     )
-    return response.data
+    if not response:
+        return None
+    return response.data if hasattr(response, 'data') else response.get('data')
 
 def list_conversations(user_id: str, limit: int = 20) -> List[dict]:
     """Lists recent conversations for a user."""

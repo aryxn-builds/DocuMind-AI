@@ -311,6 +311,18 @@ Next step requires explicit confirmation. (Frontend scaffolding or Backend datab
   **Status:** OPEN
   **Files:** `AGENTS.md`
 
+- **Issue (OD-01):** Celery + Redis vs. FastAPI BackgroundTasks for async document processing. Celery adds two additional infrastructure services; BackgroundTasks is sufficient for single-server MVP. Must be decided before any background processing code is written.
+  **Status:** OPEN — must resolve before backend scaffolding
+  **Files:** `ARCHITECTURE.md`
+
+- **Issue (OD-13):** Upload flow atomicity. The current two-step flow (Storage upload → `POST /api/documents` registration) risks orphaned files if the second step fails. Option A (atomic backend-orchestrated flow) or Option B (periodic cleanup) must be chosen before implementing upload.
+  **Status:** OPEN — must resolve before upload implementation
+  **Files:** `ARCHITECTURE.md`, `API_SPEC.md`
+
+- **Issue (OD-15):** API URL versioning. `AGENTS.md` backend structure uses `v1/` path prefix, but `API_SPEC.md` uses `/api` without version. Must be harmonized before any API routes are registered.
+  **Status:** OPEN — must resolve before API implementation
+  **Files:** `AGENTS.md`, `API_SPEC.md`
+
 ---
 
 ## 20. AI Model Handoff Instructions

@@ -191,6 +191,15 @@ flowchart TD
 
 **OPEN DECISION:** Exact chunking strategy (fixed-size, semantic, hybrid).
 
+**OPEN DECISION (OD-13) — Upload atomicity:** The two-step upload flow (Storage upload → `POST /api/documents` registration) has an orphaned-file risk: if the registration call fails after the Storage upload succeeds, a file exists in Storage with no database record. It cannot be found, processed, or deleted through normal product flows.
+
+Two mitigation options:
+- **Option A (Recommended):** Backend generates the signed URL *and* atomically creates the `documents` record (status: `awaiting_upload`) before returning the URL. Registration and signed-URL generation are a single backend operation. The worker verifies the file exists before processing.
+- **Option B:** A periodic cleanup task deletes Storage objects older than N hours with no corresponding `documents` record.
+
+This decision must be made before implementing the upload flow.
+
+
 ---
 
 ## 7. RAG Flow

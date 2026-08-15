@@ -386,7 +386,59 @@ When a user account is deleted:
 
 ---
 
-## 15. Security Checklist (Pre-Launch)
+## 17. Health Endpoint Security
+
+The `GET /health` and `GET /ready` endpoints are unauthenticated (to allow external schedulers to call them without managing user credentials). This makes their response content a security boundary.
+
+### 17.1 Mandatory Response Constraints
+
+The response body of both endpoints MUST NOT contain any of the following:
+
+| Forbidden Content | Why |
+|-------------------|-----|
+| Database connection strings | Exposes infrastructure topology |
+| API keys or tokens (Groq, Gemini, Supabase, etc.) | Enables direct credential theft |
+| Internal hostnames, IPs, or ports | Maps internal network topology |
+| Stack traces or exception messages | Reveals implementation details and potential vulnerabilities |
+| User data of any kind | Privacy violation |
+| Document content or metadata | Privacy violation |
+| Dependency version strings | Aids targeted attacks against known CVEs |
+
+The response MUST only contain:
+
+- A `status` field: `"healthy"` or `"unhealthy"`
+- A `timestamp` field (UTC ISO 8601)
+- A `dependencies` map with per-dependency status strings: `"healthy"` or `"unhealthy"` — no further detail
+
+### 17.2 Access Control Considerations
+
+| Endpoint | Access | Reasoning |
+|----------|--------|-----------|
+| `GET /health` | Public (no auth) | Liveness must be reachable by external monitors with no credentials |
+| `GET /ready` | Public by default; IP allowlist or static API key if detailed dependency info is ever added | Readiness exposes which dependencies are failing — restrict if that is sensitive |
+
+**OPEN DECISION:** Whether to protect `/ready` with an IP allowlist or a static API key. If the dependency names or failure information are considered sensitive for the deployment context, apply protection.
+
+### 17.3 Operational Monitoring vs. Policy Gaming
+
+Health checks are for detecting genuine infrastructure failures. The following patterns are explicitly prohibited:
+
+| Prohibited Pattern | Reason |
+|--------------------|--------|
+| Browser polling of health endpoints | Misleading; not operational monitoring |
+| Artificially high call frequency (< 1 min intervals) to keep providers active | Gaming inactivity policies; violates provider terms |
+| Database write loops triggered by the health check | Not read-only; causes unnecessary write load |
+| Embedding application business logic in health checks | Creates hidden side effects |
+
+Health checks must remain **lightweight**, **read-only**, and **fast**. They must not trigger document processing, LLM calls, or any stateful business operations.
+
+### 17.4 Non-Critical Dependencies
+
+Langfuse is classified as a **non-critical** dependency for health purposes. Its unavailability must not cause `GET /ready` to return 503. The application continues to function without LLM tracing — it simply loses observability.
+
+---
+
+## 18. Security Checklist (Pre-Launch)
 
 - [ ] RLS enabled on all user-scoped tables
 - [ ] All API endpoints require authentication
@@ -401,10 +453,13 @@ When a user account is deleted:
 - [ ] Prompt injection mitigations in place
 - [ ] Document deletion removes vectors from Qdrant
 - [ ] Cross-user access tests pass (user A cannot access user B's data)
+- [ ] Health endpoints return no secrets, credentials, or user data
+- [ ] Health check frequency reviewed — not unnecessarily high
+- [ ] `/ready` endpoint access protection reviewed for the deployment context
 
 ---
 
-## 16. Open Decisions
+## 19. Open Decisions
 
 | ID | Decision | Status |
 |----|----------|--------|
@@ -416,3 +471,4 @@ When a user account is deleted:
 | OD-SEC-06 | Soft delete with grace period for accounts | OPEN DECISION |
 | OD-SEC-07 | GDPR / CCPA compliance scope | OPEN DECISION |
 | OD-SEC-08 | User data export capability | OPEN DECISION |
+| OD-SEC-09 | `/ready` endpoint access protection (IP allowlist / static API key) | OPEN DECISION |

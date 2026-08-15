@@ -65,7 +65,10 @@ Every answer is grounded in your documents — not hallucinated.
        └─────────────┘ └────────┘ └─────────────┘
 ```
 
+The backend exposes `/health` (liveness) and `/ready` (readiness) endpoints. In production, an external scheduler periodically calls these to detect infrastructure failures. The system is designed so that health checks interact only with the infrastructure boundary — they do not perform business logic, expose sensitive data, or touch user documents.
+
 ---
+
 
 ## Technology Stack
 

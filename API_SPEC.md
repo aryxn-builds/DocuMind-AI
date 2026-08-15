@@ -428,7 +428,75 @@ This is the primary RAG endpoint — the core of the product.
 
 ---
 
-## 13. Rate Limiting (PROPOSED)
+## 14. Health Endpoints
+
+> **Status:** Not implemented. Conceptual design only.
+
+These endpoints serve legitimate operational monitoring. They do not require a user JWT so that an external scheduler can reach them without managing user credentials. However, they must never expose sensitive infrastructure information.
+
+### `GET /health`
+
+| Field | Value |
+|-------|-------|
+| **Concept** | Liveness — is the backend process running? |
+| **Auth** | Not required |
+| **Response 200** | `{ "status": "healthy", "timestamp": "datetime" }` |
+| **Response 503** | `{ "status": "unhealthy", "timestamp": "datetime" }` |
+| **Performance** | Must return in < 100ms. No dependency checks performed. |
+
+---
+
+### `GET /ready`
+
+| Field | Value |
+|-------|-------|
+| **Concept** | Readiness — are critical infrastructure dependencies reachable? |
+| **Auth** | Not required for basic status field; consider IP allowlist or static API key if detailed dependency information is sensitive |
+| **Response 200** | All dependencies healthy (see body below) |
+| **Response 503** | One or more dependencies failing (see body below) |
+
+**Response 200 — all healthy:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-15T12:00:00Z",
+  "dependencies": {
+    "database": "healthy",
+    "vector_store": "healthy"
+  }
+}
+```
+
+**Response 503 — dependency failure:**
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2026-08-15T12:00:00Z",
+  "dependencies": {
+    "database": "unhealthy",
+    "vector_store": "healthy"
+  }
+}
+```
+
+**What these responses MUST NOT contain:**
+
+- Database connection strings or credentials
+- API keys or tokens
+- Internal hostnames, IPs, or ports
+- Stack traces or detailed error messages
+- User data or document content
+
+**Implementation guidance (for when these endpoints are built):**
+- Database check: a lightweight `SELECT 1` through the existing connection pool — do not open a new connection
+- Qdrant check: the Qdrant status or collections API — do not run a vector search
+- Treat Langfuse as non-critical: its unavailability should not make `/ready` return 503
+- Total readiness check must complete within 2 seconds
+- The external monitor calls these endpoints; it is for operational observability, not for circumventing provider inactivity policies
+
+---
+
+## 15. Rate Limiting (PROPOSED)
 
 | Endpoint Category | Limit |
 |-------------------|-------|
@@ -442,7 +510,7 @@ This is the primary RAG endpoint — the core of the product.
 
 ---
 
-## 14. Open Decisions
+## 16. Open Decisions
 
 | ID | Decision | Status |
 |----|----------|--------|
@@ -451,3 +519,5 @@ This is the primary RAG endpoint — the core of the product.
 | OD-API-03 | Pagination strategy (cursor vs offset) | PROPOSED: cursor-based |
 | OD-API-04 | API versioning strategy | OPEN DECISION (not needed for MVP) |
 | OD-API-05 | Maximum file upload size | OPEN DECISION |
+| OD-API-06 | `/ready` endpoint access protection (IP allowlist / static API key) | OPEN DECISION |
+| OD-API-07 | Separate `/health` + `/ready` vs. single combined endpoint | PROPOSED: separate |

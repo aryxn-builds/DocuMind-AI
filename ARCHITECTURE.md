@@ -430,7 +430,129 @@ graph TB
 
 ---
 
-## 15. Open Decisions Summary
+## 15. Health Monitoring & Service Availability
+
+### 15.1 Purpose
+
+The backend exposes a health endpoint for **legitimate operational monitoring**: verifying that the process is running and that critical infrastructure dependencies are reachable. This is not a mechanism for defeating cloud provider inactivity policies — it is standard production observability practice.
+
+### 15.2 Liveness vs. Readiness
+
+| Concept | Question | Failure Meaning |
+|---------|----------|-----------------|
+| **Liveness** | Is the backend process alive? | Process has crashed or is deadlocked |
+| **Readiness** | Can the backend serve requests? | A critical dependency (database, vector store) is unreachable |
+
+The eventual implementation may expose both as separate endpoints:
+
+| Endpoint | Concept | Description |
+|----------|---------|-------------|
+| `GET /health` | Liveness | Backend process is running; lightweight, always fast |
+| `GET /ready` | Readiness | All critical dependencies are reachable; slightly heavier |
+
+Neither endpoint is implemented yet. See `API_SPEC.md` for the conceptual design.
+
+### 15.3 Dependency Checks
+
+The readiness probe checks the following infrastructure boundaries:
+
+| Dependency | Check | Method |
+|------------|-------|--------|
+| Supabase PostgreSQL | Database is reachable | Lightweight query (e.g., `SELECT 1`) |
+| Qdrant | Vector store is reachable | Qdrant status or collections API |
+
+Dependency checks are **read-only** and return no user data, no document content, and no secrets.
+
+### 15.4 Health Check Architecture
+
+```mermaid
+flowchart TD
+    M["Scheduled External Monitor<br/>(GitHub Actions / external service)"]
+    H["FastAPI Health Endpoint<br/>GET /health or GET /ready"]
+    DB["Supabase PostgreSQL"]
+    V["Qdrant"]
+    R["Health Result<br/>{ status, timestamp, dependencies }"]
+
+    M --> H
+    H --> DB
+    H --> V
+    DB --> R
+    V --> R
+```
+
+The monitor calls the backend health endpoint, which checks its infrastructure dependencies and returns a structured status result. The monitor then alerts on failure.
+
+### 15.5 Infrastructure Abstraction
+
+Health checks interact with the infrastructure layer — the same boundary used by all other services — and do not embed provider-specific logic in business logic:
+
+```
+FastAPI Health Endpoint
+        ↓
+Health Check Service
+        ↓
+Infrastructure Interfaces
+        ├── Database Repository   (Supabase)
+        └── Vector Store Client  (Qdrant)
+```
+
+This keeps provider-specific connection details inside their respective infrastructure adapters, not scattered through application code.
+
+### 15.6 Scheduled External Monitoring
+
+In production, an external scheduler periodically calls the health endpoint to detect outages. Candidates include:
+
+- GitHub Actions (scheduled workflow)
+- A free uptime monitoring service
+- Another appropriate scheduler
+
+**Scheduling guidance:**
+- The cadence should be appropriate for operational awareness — not unnecessarily frequent
+- Every few minutes to every few days depending on the production SLA
+- Do **not** use per-minute or per-second polling for a portfolio or early-stage deployment
+- Do **not** use browser-based polling or client-side loops for infrastructure health
+- The scheduler is for operational visibility, not for gaming provider inactivity policies
+
+### 15.7 Supabase Free-Tier Availability
+
+Supabase free-tier projects may be paused after a period of low activity. The following positions are documented explicitly:
+
+| Position | Statement |
+|----------|-----------|
+| Health checks do NOT guarantee activity prevention | Supabase's inactivity policy is not defeated by external pings |
+| No circumvention intent | The monitoring system is designed for operational health, not policy gaming |
+| Manual resume is always available | If a dev/portfolio project is paused, it can be resumed manually through the Supabase dashboard |
+| Paid plans for guaranteed availability | If continuous availability is required for production, a paid Supabase plan (or alternative provider) should be evaluated |
+| Free-tier behaviour is not permanent | Supabase's inactivity policy may change; do not design the system around any assumption about it |
+
+### 15.8 Health Response Contract
+
+The health endpoint returns a structured response with no sensitive information:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-15T12:00:00Z",
+  "dependencies": {
+    "database": "healthy",
+    "vector_store": "healthy"
+  }
+}
+```
+
+What the response MUST NOT include:
+
+- Database connection strings or credentials
+- API keys or tokens
+- Internal hostnames or ports
+- Stack traces or error details
+- User data or document content
+
+See `SECURITY.md` §17 for full security requirements for this endpoint.
+
+---
+
+## 16. Open Decisions Summary
 
 | ID | Decision | Status |
 |----|----------|--------|
@@ -441,3 +563,6 @@ graph TB
 | OD-ARCH-05 | Qdrant collection strategy (single vs. multiple) | PROPOSED: single |
 | OD-ARCH-06 | Real-time status updates (WebSocket/SSE vs. polling) | OPEN DECISION |
 | OD-ARCH-07 | Production deployment target | OPEN DECISION |
+| OD-ARCH-08 | External monitoring provider (GitHub Actions / uptime service) | OPEN DECISION |
+| OD-ARCH-09 | Health check cadence for production monitoring | OPEN DECISION |
+| OD-ARCH-10 | Separate `/health` + `/ready` vs. single endpoint | PROPOSED: separate |

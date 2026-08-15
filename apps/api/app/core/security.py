@@ -1,6 +1,6 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
 from app.core.config import settings
@@ -34,11 +34,11 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     try:
         signing_key = jwks_client.get_signing_key_from_jwt(token)
-        
+
         # Audience and Issuer based on Supabase documentation and user spec
         base_url = settings.supabase_url.rstrip("/")
         expected_issuer = f"{base_url}/auth/v1"
-        
+
         payload = jwt.decode(
             token,
             signing_key.key,
@@ -47,14 +47,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             issuer=expected_issuer,
             options={"verify_exp": True}
         )
-        
+
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token missing subject claim"
             )
-            
+
         return user_id
 
     except jwt.PyJWKClientError as e:
@@ -72,7 +72,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}"
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed"

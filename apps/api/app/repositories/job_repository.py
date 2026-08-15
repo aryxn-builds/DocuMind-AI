@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
 
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from app.core.config import settings
 
@@ -60,7 +59,7 @@ def insert_job(
     return response.data[0]
 
 
-def get_job_by_document(document_id: uuid.UUID, user_id: str) -> Optional[dict]:
+def get_job_by_document(document_id: uuid.UUID, user_id: str) -> dict | None:
     """Returns the most recent job for a given document."""
     response = (
         _client()

@@ -17,9 +17,9 @@ using backend-supplied user_id and document_id — never from user input.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from app.core.config import settings
 
@@ -77,7 +77,7 @@ def generate_signed_upload_url(file_path: str) -> tuple[str, datetime]:
                 f"Response: {response}"
             )
 
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=SIGNED_URL_TTL_SECONDS)
+        expires_at = datetime.now(UTC) + timedelta(seconds=SIGNED_URL_TTL_SECONDS)
         return signed_url, expires_at
 
     except Exception as exc:

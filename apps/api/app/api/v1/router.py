@@ -13,10 +13,11 @@ api_v1_router = APIRouter()
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
-from app.api.v1.endpoints import auth
-# from app.api.v1.endpoints import documents, conversations, search, collections
+from app.api.v1.endpoints import auth, documents
+
+# from app.api.v1.endpoints import conversations, search, collections
 api_v1_router.include_router(auth.router, prefix="", tags=["auth"])
-# api_v1_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+api_v1_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 # api_v1_router.include_router(conversations.router, prefix="/conversations", tags=["conversations"])  # noqa: E501
 # api_v1_router.include_router(search.router, prefix="/search", tags=["search"])
 # api_v1_router.include_router(collections.router, prefix="/collections", tags=["collections"])

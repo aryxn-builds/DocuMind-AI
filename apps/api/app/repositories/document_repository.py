@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
 
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from app.core.config import settings
 
@@ -69,7 +68,7 @@ def insert_document(
     return response.data[0]
 
 
-def get_document_by_id(document_id: uuid.UUID, user_id: str) -> Optional[dict]:
+def get_document_by_id(document_id: uuid.UUID, user_id: str) -> dict | None:
     """
     Fetches a document by ID, filtered strictly by user_id.
     Returns None if not found or not owned by this user (caller returns 404).
@@ -90,7 +89,7 @@ def update_document_status(
     document_id: uuid.UUID,
     user_id: str,
     status: str,
-) -> Optional[dict]:
+) -> dict | None:
     """Updates the status column of a document."""
     response = (
         _client()
@@ -105,9 +104,9 @@ def update_document_status(
 
 def list_documents(
     user_id: str,
-    status_filter: Optional[str] = None,
+    status_filter: str | None = None,
     limit: int = 20,
-    cursor: Optional[str] = None,
+    cursor: str | None = None,
 ) -> list[dict]:
     """
     Lists documents for a user, ordered by created_at DESC.

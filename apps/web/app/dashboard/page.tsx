@@ -1,6 +1,7 @@
 import { signout } from '../login/actions'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { DocumentDashboard } from '@/components/DocumentDashboard'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -40,6 +41,7 @@ export default async function DashboardPage() {
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
           Welcome back.
         </p>
+        <DocumentDashboard />
       </main>
     </div>
   )

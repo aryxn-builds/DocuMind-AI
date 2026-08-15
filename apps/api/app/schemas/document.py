@@ -12,10 +12,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ---------------------------------------------------------------------------
 # Constants (mirrors DATABASE_SCHEMA.md §3.2 and §3.9 status enums)
@@ -97,7 +95,7 @@ class DocumentRegisterRequest(BaseModel):
     original_filename: str = Field(..., min_length=1, max_length=500)
     file_type: str = Field(...)
     file_size_bytes: int = Field(..., gt=0)
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None,
         max_length=500,
         description="Optional display title. Defaults to original_filename.",
@@ -125,8 +123,8 @@ class DocumentResponse(BaseModel):
     file_type: str
     file_size_bytes: int
     status: str
-    page_count: Optional[int] = None
-    processing_metadata: Optional[dict] = None
+    page_count: int | None = None
+    processing_metadata: dict | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -137,15 +135,15 @@ class DocumentStatusResponse(BaseModel):
     """Lightweight polling response for status checks."""
 
     status: str
-    progress: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    error_details: Optional[dict] = None
+    progress: float | None = Field(default=None, ge=0.0, le=1.0)
+    error_details: dict | None = None
 
 
 class DocumentListResponse(BaseModel):
     """Paginated list of documents."""
 
     documents: list[DocumentResponse]
-    next_cursor: Optional[str] = None
+    next_cursor: str | None = None
     total: int
 
 
@@ -160,10 +158,10 @@ class ProcessingJobResponse(BaseModel):
     user_id: uuid.UUID
     job_type: str
     status: str
-    progress: Optional[float] = None
-    error_details: Optional[dict] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    progress: float | None = None
+    error_details: dict | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

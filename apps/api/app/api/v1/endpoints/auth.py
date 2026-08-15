@@ -1,6 +1,7 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Dict, Any
 
 from app.core.security import get_current_user
 

@@ -15,7 +15,12 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
-    redirect('/login?error=Could not authenticate user')
+    console.error('[Auth Error] signInWithPassword failed:', {
+      message: error.message,
+      status: error.status,
+      name: error.name
+    })
+    redirect(`/login?error=${encodeURIComponent(error.message)}`)
   }
 
   revalidatePath('/', 'layout')
@@ -28,7 +33,7 @@ export async function signup(formData: FormData) {
   const fullName = formData.get('fullName') as string
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -39,7 +44,17 @@ export async function signup(formData: FormData) {
   })
 
   if (error) {
-    redirect('/signup?error=Could not create user')
+    console.error('[Auth Error] signUp failed:', {
+      message: error.message,
+      status: error.status,
+      name: error.name
+    })
+    redirect(`/signup?error=${encodeURIComponent(error.message)}`)
+  }
+
+  if (data?.user && !data.session) {
+    // Email confirmation is required
+    redirect('/signup?message=Check your email to confirm your account')
   }
 
   revalidatePath('/', 'layout')

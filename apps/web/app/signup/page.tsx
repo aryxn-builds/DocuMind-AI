@@ -4,9 +4,9 @@ import { signup } from '../login/actions'
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string, message?: string }>
 }) {
-  const { error } = await searchParams
+  const { error, message } = await searchParams
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-zinc-50 dark:bg-zinc-950">
@@ -73,6 +73,12 @@ export default async function SignupPage({
           {error && (
             <div className="mt-2 text-sm font-medium text-red-600 dark:text-red-400">
               {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">
+              {message}
             </div>
           )}
 

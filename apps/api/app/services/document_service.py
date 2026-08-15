@@ -10,7 +10,7 @@ import logging
 import re
 import uuid
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, BackgroundTasks
 
 from app.repositories import document_repository, job_repository
 from app.schemas.document import (
@@ -19,13 +19,17 @@ from app.schemas.document import (
     DocumentRegisterRequest,
     DocumentRegisterResponse,
     DocumentResponse,
+    DocumentStatusResponse,
     SignedUrlRequest,
     SignedUrlResponse,
 )
 from app.services import storage_service
+from app.ai.processing_orchestrator import ProcessingOrchestrator
 
 logger = logging.getLogger(__name__)
 
+# Single instance of orchestrator for background tasks
+orchestrator = ProcessingOrchestrator()
 
 def sanitize_filename(filename: str) -> str:
     """
@@ -109,8 +113,36 @@ def get_upload_url(user_id: str, request: SignedUrlRequest) -> SignedUrlResponse
         expires_at=expires_at,
     )
 
+def get_document_status(user_id: str, document_id: uuid.UUID) -> DocumentStatusResponse:
+    """Retrieves lightweight processing status and progress."""
+    doc = document_repository.get_document_by_id(document_id, user_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+        
+    job = job_repository.get_job_by_document(document_id, user_id)
+    progress = 0.0
+    error_details = None
+    
+    if job:
+        progress = job.get("progress") or 0.0
+        error_details = job.get("error_details")
+        
+    return DocumentStatusResponse(
+        status=doc["status"],
+        progress=progress,
+        error_details=error_details
+    )
 
-def register_document(user_id: str, request: DocumentRegisterRequest) -> DocumentRegisterResponse:
+# ...
+
+def register_document(
+    user_id: str, 
+    request: DocumentRegisterRequest,
+    background_tasks: BackgroundTasks
+) -> DocumentRegisterResponse:
     """
     Called after the client successfully uploads to Storage.
     Verifies the file exists, updates status, and queues processing.
@@ -138,8 +170,6 @@ def register_document(user_id: str, request: DocumentRegisterRequest) -> Documen
 
     # Check if the object actually exists in Supabase Storage
     if not storage_service.object_exists(request.file_path):
-        # A. Storage upload succeeds but document registration fails -> remove uploaded object?
-        # Here object does NOT exist, so upload failed.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File not found in storage. The upload may not have completed.",
@@ -167,8 +197,6 @@ def register_document(user_id: str, request: DocumentRegisterRequest) -> Documen
         )
     except Exception as exc:
         logger.error(f"Failed to create processing job: {exc}")
-        # B. Document registration succeeds but processing_jobs creation fails
-        # -> leave a deterministic recoverable state.
         document_repository.update_document_status(
             document_id=request.document_id,
             user_id=user_id,
@@ -178,6 +206,9 @@ def register_document(user_id: str, request: DocumentRegisterRequest) -> Documen
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document was registered but failed to queue for processing.",
         ) from exc
+
+    # Dispatch to background tasks
+    background_tasks.add_task(orchestrator.run, job["id"], str(request.document_id), user_id)
 
     return DocumentRegisterResponse(
         id=request.document_id,

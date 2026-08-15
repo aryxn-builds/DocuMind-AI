@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone, timedelta
 
 from supabase import Client, create_client
 
@@ -72,3 +73,90 @@ def get_job_by_document(document_id: uuid.UUID, user_id: str) -> dict | None:
         .execute()
     )
     return response.data[0] if response.data else None
+
+
+def claim_job(job_id: str) -> dict | None:
+    """
+    Atomically claim a queued job by setting it to processing.
+    Returns the updated job if successful, or None if already claimed/failed.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    response = (
+        _client()
+        .table(TABLE)
+        .update({"status": "processing", "started_at": now, "progress": 0.0})
+        .eq("id", job_id)
+        .eq("status", "queued")
+        .execute()
+    )
+    
+    if response.data:
+        return response.data[0]
+    return None
+
+
+def update_job_progress(job_id: str, progress: float, status: str = "processing") -> None:
+    """Updates the progress and status of a job."""
+    _client().table(TABLE).update({"progress": progress, "status": status}).eq("id", job_id).execute()
+
+
+def fail_job(job_id: str, stage: str, message: str, retry_count: int) -> None:
+    """Marks a job as failed and records error details."""
+    now = datetime.now(timezone.utc).isoformat()
+    error_details = {
+        "stage": stage,
+        "message": message,
+        "retry_count": retry_count
+    }
+    _client().table(TABLE).update({
+        "status": "failed",
+        "error_details": error_details,
+        "completed_at": now
+    }).eq("id", job_id).execute()
+
+
+def complete_job(job_id: str) -> None:
+    """Marks a job as successfully completed."""
+    now = datetime.now(timezone.utc).isoformat()
+    _client().table(TABLE).update({
+        "status": "completed",
+        "progress": 1.0,
+        "completed_at": now
+    }).eq("id", job_id).execute()
+
+
+def find_stale_processing_jobs(older_than_minutes: int) -> list[dict]:
+    """Finds jobs stuck in processing state for longer than the specified minutes."""
+    threshold = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    
+    response = (
+        _client()
+        .table(TABLE)
+        .select("*")
+        .eq("status", "processing")
+        .lt("started_at", threshold.isoformat())
+        .execute()
+    )
+    return response.data or []
+
+def fail_stale_jobs(message: str) -> int:
+    """Marks all 'processing' or 'queued' jobs as failed during process startup."""
+    now = datetime.now(timezone.utc).isoformat()
+    count = 0
+    
+    for status in ["processing", "queued"]:
+        response = (
+            _client()
+            .table(TABLE)
+            .update({
+                "status": "failed",
+                "completed_at": now,
+                "error_details": {"stage": "startup", "message": message, "retry_count": 0}
+            })
+            .eq("status", status)
+            .execute()
+        )
+        if response.data:
+            count += len(response.data)
+            
+    return count

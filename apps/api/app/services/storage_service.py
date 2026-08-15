@@ -156,3 +156,27 @@ def delete_object(file_path: str) -> bool:
             extra={"file_path": file_path, "error": str(exc)},
         )
         return False
+
+
+def download_document(file_path: str) -> bytes:
+    """
+    Downloads a document from Supabase Storage.
+    
+    Returns:
+        The raw bytes of the file.
+        
+    Raises:
+        RuntimeError: if the download fails.
+    """
+    client = _get_admin_client()
+    try:
+        response = client.storage.from_(STORAGE_BUCKET).download(file_path)
+        if not response:
+            raise RuntimeError("Empty response from Supabase storage download.")
+        return response
+    except Exception as exc:
+        logger.error(
+            "storage.download_failed",
+            extra={"file_path": file_path, "error": str(exc)},
+        )
+        raise RuntimeError(f"Failed to download document: {exc}") from exc

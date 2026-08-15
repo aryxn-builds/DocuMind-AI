@@ -4,7 +4,7 @@ DocuMind AI — Documents Endpoints.
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, BackgroundTasks
 
 from app.core.security import get_current_user
 from app.schemas.document import (
@@ -12,12 +12,28 @@ from app.schemas.document import (
     DocumentRegisterRequest,
     DocumentRegisterResponse,
     DocumentResponse,
+    DocumentStatusResponse,
     SignedUrlRequest,
     SignedUrlResponse,
 )
 from app.services import document_service
 
 router = APIRouter()
+
+
+@router.get(
+    "/{document_id}/status",
+    response_model=DocumentStatusResponse,
+    summary="Get processing status of a document",
+)
+def get_document_status(
+    document_id: uuid.UUID,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Retrieve lightweight status and progress for a document.
+    """
+    return document_service.get_document_status(user_id=user_id, document_id=document_id)
 
 
 @router.post(
@@ -38,6 +54,7 @@ def get_signed_url(
     return document_service.get_upload_url(user_id=user_id, request=request)
 
 
+
 @router.post(
     "/register",
     response_model=DocumentRegisterResponse,
@@ -46,13 +63,14 @@ def get_signed_url(
 )
 def register_document(
     request: DocumentRegisterRequest,
+    background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user),
 ):
     """
     Called after the client has successfully uploaded the file to the signed URL.
     This endpoint verifies the upload and queues the processing job.
     """
-    return document_service.register_document(user_id=user_id, request=request)
+    return document_service.register_document(user_id=user_id, request=request, background_tasks=background_tasks)
 
 
 @router.get(

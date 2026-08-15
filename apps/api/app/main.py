@@ -5,8 +5,27 @@ DocuMind AI — FastAPI Application Entry Point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+from contextlib import asynccontextmanager
+
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
+from app.repositories import job_repository
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: fail any jobs that were left running or queued when the process crashed
+    try:
+        count = job_repository.fail_stale_jobs("Process restarted unexpectedly")
+        if count > 0:
+            logger.warning(f"Marked {count} stale jobs as failed during startup.")
+    except Exception as e:
+        logger.error(f"Failed to run stale job sweep: {e}")
+        
+    yield
+    # Shutdown
 
 app = FastAPI(
     title=settings.app_name,
@@ -15,6 +34,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------------------

@@ -548,7 +548,7 @@ What the response MUST NOT include:
 - Stack traces or error details
 - User data or document content
 
-See `SECURITY.md` §17 for full security requirements for this endpoint.
+See `SECURITY.md` §15 for full security requirements for this endpoint.
 
 ---
 

@@ -386,11 +386,11 @@ When a user account is deleted:
 
 ---
 
-## 17. Health Endpoint Security
+## 15. Health Endpoint Security
 
 The `GET /health` and `GET /ready` endpoints are unauthenticated (to allow external schedulers to call them without managing user credentials). This makes their response content a security boundary.
 
-### 17.1 Mandatory Response Constraints
+### 15.1 Mandatory Response Constraints
 
 The response body of both endpoints MUST NOT contain any of the following:
 
@@ -410,7 +410,7 @@ The response MUST only contain:
 - A `timestamp` field (UTC ISO 8601)
 - A `dependencies` map with per-dependency status strings: `"healthy"` or `"unhealthy"` — no further detail
 
-### 17.2 Access Control Considerations
+### 15.2 Access Control Considerations
 
 | Endpoint | Access | Reasoning |
 |----------|--------|-----------|
@@ -419,7 +419,7 @@ The response MUST only contain:
 
 **OPEN DECISION:** Whether to protect `/ready` with an IP allowlist or a static API key. If the dependency names or failure information are considered sensitive for the deployment context, apply protection.
 
-### 17.3 Operational Monitoring vs. Policy Gaming
+### 15.3 Operational Monitoring vs. Policy Gaming
 
 Health checks are for detecting genuine infrastructure failures. The following patterns are explicitly prohibited:
 
@@ -432,13 +432,13 @@ Health checks are for detecting genuine infrastructure failures. The following p
 
 Health checks must remain **lightweight**, **read-only**, and **fast**. They must not trigger document processing, LLM calls, or any stateful business operations.
 
-### 17.4 Non-Critical Dependencies
+### 15.4 Non-Critical Dependencies
 
 Langfuse is classified as a **non-critical** dependency for health purposes. Its unavailability must not cause `GET /ready` to return 503. The application continues to function without LLM tracing — it simply loses observability.
 
 ---
 
-## 18. Security Checklist (Pre-Launch)
+## 16. Security Checklist (Pre-Launch)
 
 - [ ] RLS enabled on all user-scoped tables
 - [ ] All API endpoints require authentication
@@ -459,7 +459,7 @@ Langfuse is classified as a **non-critical** dependency for health purposes. Its
 
 ---
 
-## 19. Open Decisions
+## 17. Open Decisions
 
 | ID | Decision | Status |
 |----|----------|--------|

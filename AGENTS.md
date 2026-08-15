@@ -31,7 +31,7 @@
 18. **Do not add browser-side polling solely to keep infrastructure active.** Client-side polling for infrastructure health is not operational monitoring — it creates misleading load and hidden coupling.
 19. **Do not run health checks at unnecessarily high frequency.** For portfolio or early-stage deployments, very frequent monitoring (sub-minute intervals) is not justified. Choose a cadence appropriate to actual operational needs.
 20. **Health endpoints must remain lightweight and read-only where possible.** They must not trigger document processing, LLM calls, embedding generation, or any stateful business logic.
-21. **Never expose secrets or sensitive infrastructure details in health responses.** See `SECURITY.md` §17 for the complete list of prohibited content.
+21. **Never expose secrets or sensitive infrastructure details in health responses.** See `SECURITY.md` §15 for the complete list of prohibited content.
 22. **Infrastructure health logic belongs at the infrastructure boundary.** Dependency checks (database, vector store) belong inside their respective infrastructure adapters — not scattered through business logic or API route handlers.
 23. **Document any production monitoring change.** If the external monitoring provider, schedule, or health check design changes, update `ARCHITECTURE.md` accordingly.
 

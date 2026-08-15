@@ -3,13 +3,12 @@
 /* ==========================================================================
    DocuMind AI — Global Design System Tokens
    Source of truth: design-system/MASTER.md
-   ========================================================================== */
 
-@theme inline {
-  /* Fonts — loaded via next/font in layout.tsx */
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains-mono);
-}
+   Typography note: The design system specifies Inter (UI) and JetBrains Mono
+   (data/code). For the scaffold shell, system fonts are used to avoid
+   external network dependencies. Actual font loading will be introduced
+   during the full UI implementation phase.
+   ========================================================================== */
 
 :root {
   /* ------------------------------------------------------------------
@@ -73,10 +72,20 @@
   --text-3xl:  30px;
 
   /* ------------------------------------------------------------------
-     Elevation (subtle shadows, not drop-shadows)
+     Font stacks
+     System fonts used in the scaffold shell.
+     Replaced with Inter + JetBrains Mono during UI implementation.
      ------------------------------------------------------------------ */
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* ------------------------------------------------------------------
+     Elevation (subtle, not drop-shadow heavy)
+     ------------------------------------------------------------------ */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
 }
 
 /* ==========================================================================
@@ -100,17 +109,17 @@ body {
   min-height: 100%;
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.5;
 }
 
-/* Monospace elements default to JetBrains Mono */
+/* Monospace elements */
 code,
 pre,
 kbd,
 samp {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
@@ -122,13 +131,13 @@ nav ol {
   padding: 0;
 }
 
-/* Focus ring — visible, keyboard-only */
+/* Focus ring — visible, keyboard-accessible */
 :focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
-/* Scrollbar — subtle, matching dark theme */
+/* Scrollbar — subtle, dark theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

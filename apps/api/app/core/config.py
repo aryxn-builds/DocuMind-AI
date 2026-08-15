@@ -41,10 +41,6 @@ class Settings(BaseSettings):
         default="",
         description="Supabase service role key (server-side only).",
     )
-    supabase_jwt_secret: str = Field(
-        default="",
-        description="Supabase JWT secret for token verification.",
-    )
     database_url: str = Field(default="", description="PostgreSQL connection string.")
 
     # --------------------------------------------------

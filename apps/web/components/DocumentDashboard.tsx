@@ -25,7 +25,7 @@ export function DocumentDashboard() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const supabase = createClient()
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (isPolling = false) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -38,8 +38,13 @@ export function DocumentDashboard() {
       if (!res.ok) throw new Error('Failed to fetch documents')
       const data = await res.json()
       setDocuments(data.documents)
+      setError(null)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (!isPolling) {
+        setError(err instanceof Error ? err.message : String(err))
+      } else {
+        console.error('Background poll failed:', err)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -50,12 +55,11 @@ export function DocumentDashboard() {
     fetchDocuments()
   }, [fetchDocuments])
 
-
   // Auto-poll while any document is still processing
   useEffect(() => {
     const hasPending = documents.some(d => d.status === 'processing' || d.status === 'queued')
     if (!hasPending) return
-    const interval = setInterval(fetchDocuments, 4000)
+    const interval = setInterval(() => fetchDocuments(true), 4000)
     return () => clearInterval(interval)
   }, [documents, fetchDocuments])
 

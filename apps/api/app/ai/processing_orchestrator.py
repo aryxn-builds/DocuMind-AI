@@ -107,5 +107,12 @@ class ProcessingOrchestrator:
 
         except Exception as e:
             logger.error(f"Processing failed for job {job_id}: {e}", exc_info=True)
-            job_repository.fail_job(job_id, stage="processing", message=str(e), retry_count=0)
-            document_repository.update_document_status(document_id, user_id, "failed")
+            try:
+                job_repository.fail_job(job_id, stage="processing", message=str(e), retry_count=0)
+            except Exception as e_job:
+                logger.error(f"Failed to update job status to failed: {e_job}")
+            
+            try:
+                document_repository.update_document_status(document_id, user_id, "failed")
+            except Exception as e_doc:
+                logger.error(f"Failed to update document status to failed: {e_doc}")

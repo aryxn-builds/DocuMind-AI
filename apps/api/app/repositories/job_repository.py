@@ -145,18 +145,24 @@ def fail_stale_jobs(message: str) -> int:
     count = 0
 
     for status in ["processing", "queued"]:
-        response = (
-            _client()
-            .table(TABLE)
-            .update({
+        # Select jobs first so we know which documents to update
+        response = _client().table(TABLE).select("id, document_id, user_id").eq("status", status).execute()
+        if not response.data:
+            continue
+            
+        for job in response.data:
+            # Update job status
+            _client().table(TABLE).update({
                 "status": "failed",
                 "completed_at": now,
                 "error_details": {"stage": "startup", "message": message, "retry_count": 0}
-            })
-            .eq("status", status)
-            .execute()
-        )
-        if response.data:
-            count += len(response.data)
+            }).eq("id", job["id"]).execute()
+            
+            # Update document status to failed
+            _client().table("documents").update({
+                "status": "failed"
+            }).eq("id", job["document_id"]).eq("user_id", job["user_id"]).execute()
+            
+            count += 1
 
     return count

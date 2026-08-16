@@ -58,6 +58,7 @@ async def _stream_one_chunk(content: str) -> AsyncGenerator[dict, None]:
 # 1. Citation injection — LLM cannot cite an arbitrary chunk_id
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
+@patch("app.repositories.chunk_repository")
 @patch("app.services.rag_service.conversation_repository")
 @patch("app.services.rag_service.message_repository")
 @patch("app.services.rag_service.retrieval_service")
@@ -69,13 +70,14 @@ async def test_citation_injection_rejected(
     mock_retrieval,
     mock_message_repo,
     mock_convo_repo,
+    mock_chunk_repo,
     svc: RagService,
 ):
     """
     The LLM response references a chunk_id that was NOT returned by Qdrant
     retrieval. That citation must NOT be persisted.
     """
-    user_id = "user-a"
+    user_id = str(uuid.uuid4())
     conversation_id = uuid.uuid4()
     real_chunk_id = uuid.uuid4()
     fake_chunk_id = uuid.uuid4()  # attacker / hallucinated chunk
@@ -86,6 +88,7 @@ async def test_citation_injection_rejected(
     mock_retrieval.search.return_value = _make_search_response(
         [_make_search_result(real_chunk_id, uuid.uuid4())]
     )
+    mock_chunk_repo.get_chunks_by_ids.return_value = [{"id": str(real_chunk_id), "document_id": str(uuid.uuid4())}]
 
     # LLM response cites the REAL chunk AND an invented chunk
     llm_response = (
@@ -134,7 +137,7 @@ async def test_unauthorized_conversation_raises(
     When the conversation does not belong to the authenticated user,
     stream_chat must raise ValueError before any LLM call or DB write.
     """
-    user_id = "user-a"
+    user_id = str(uuid.uuid4())
     conversation_id = uuid.uuid4()
 
     # Simulate repository returning None (conversation exists but owned by
@@ -220,7 +223,7 @@ async def test_empty_retrieval_context_prompt(
     When Qdrant returns no results the system prompt must include the
     'No relevant documents found' sentinel so the LLM is grounded to refuse.
     """
-    user_id = "user-a"
+    user_id = str(uuid.uuid4())
     conversation_id = uuid.uuid4()
     mock_convo_repo.get_conversation_by_id.return_value = {"id": str(conversation_id)}
     mock_message_repo.create_message.return_value = {"id": str(uuid.uuid4())}
@@ -270,7 +273,7 @@ async def test_streaming_failure_no_assistant_message(
     If the LLM streaming raises an exception partway through, the service
     must NOT persist a completed assistant message with error text in it.
     """
-    user_id = "user-a"
+    user_id = str(uuid.uuid4())
     conversation_id = uuid.uuid4()
     msg_id = str(uuid.uuid4())
     mock_convo_repo.get_conversation_by_id.return_value = {"id": str(conversation_id)}

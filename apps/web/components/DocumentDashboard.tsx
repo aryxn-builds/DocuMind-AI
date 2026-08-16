@@ -49,6 +49,15 @@ export function DocumentDashboard() {
     fetchDocuments()
   }, [fetchDocuments])
 
+
+  // Auto-poll while any document is still processing
+  useEffect(() => {
+    const hasPending = documents.some(d => d.status === 'processing' || d.status === 'queued')
+    if (!hasPending) return
+    const interval = setInterval(fetchDocuments, 4000)
+    return () => clearInterval(interval)
+  }, [documents, fetchDocuments])
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -214,8 +223,16 @@ export function DocumentDashboard() {
                     {doc.original_filename}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 capitalize border border-zinc-200 dark:border-zinc-700">
-                      {doc.status}
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border capitalize ${
+                      doc.status === 'ready' 
+                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-900'
+                        : doc.status === 'failed'
+                        ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900'
+                        : doc.status === 'processing' || doc.status === 'queued'
+                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-900'
+                        : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+                    }`}>
+                      {doc.status === 'processing' || doc.status === 'queued' ? '⟳ ' : ''}{doc.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-zinc-500">

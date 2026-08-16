@@ -44,6 +44,6 @@ async def test_stream_chat_success(
     async for chunk in rag_service.stream_chat(user_id, conversation_id, request):
         chunks.append(chunk)
         
-    assert "".join(chunks) == "This is the answer."
+    assert "".join([c["content"] for c in chunks if c.get("type") == "chunk"]) == "This is the answer."
     mock_conversation_repo.get_conversation_by_id.assert_called_once_with(conversation_id, user_id)
     assert mock_message_repo.create_message.call_count == 2

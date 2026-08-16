@@ -89,8 +89,8 @@ async def send_message_stream(
 
     async def generate_sse():
         try:
-            async for chunk in rag_service.stream_chat(user_id, conversation_id, request):
-                data = json.dumps({"content": chunk})
+            async for data_item in rag_service.stream_chat(user_id, conversation_id, request):
+                data = json.dumps(data_item)
                 yield f"data: {data}\n\n"
 
             # Signal successful completion

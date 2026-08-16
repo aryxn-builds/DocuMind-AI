@@ -104,7 +104,9 @@ async def test_citation_injection_rejected(
     request = RagRequest(query="test", document_id=uuid.uuid4())
     chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request)]
 
-    assert "".join(chunks) == llm_response
+    # Check chunks and citations
+    text_chunks = [c["content"] for c in chunks if c.get("type") == "chunk"]
+    assert "".join(text_chunks) == llm_response
 
     # Only the real citation should have been passed to the repo
     mock_citation_repo.create_citations.assert_called_once()
@@ -293,7 +295,7 @@ async def test_streaming_failure_no_assistant_message(
     chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request)]
 
     # The error chunk is yielded (system error message)
-    assert any("[System Error:" in c for c in chunks), (
+    assert any("[System Error:" in c.get("content", "") for c in chunks), (
         "Service should yield an error indicator"
     )
     # create_message must have been called only ONCE (for the user message);

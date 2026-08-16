@@ -91,11 +91,11 @@ class RagService:
                 model = chunk["model"]
                 content = chunk["content"]
                 full_response += content
-                yield content
+                yield {"type": "chunk", "content": content}
 
         except Exception as e:
             logger.error(f"RAG streaming failed: {e}")
-            yield f"\n\n[System Error: Failed to generate response - {str(e)}]"
+            yield {"type": "chunk", "content": f"\n\n[System Error: Failed to generate response - {str(e)}]"}
             return
 
         # 6. Parse Citations
@@ -142,14 +142,25 @@ class RagService:
                         "document_id": db_chunk["document_id"],
                         "chunk_id": db_chunk["id"],
                         "page_number": db_chunk.get("page_number"),
-                        "excerpt": db_chunk.get("content_preview", "")[:200], # store preview
+                        "excerpt": db_chunk.get("content", "")[:200], # store a snippet
                         "relevance_score": relevance_score
                     })
                 else:
                     logger.warning(f"Dropping invalid citation chunk_id={chunk_id_str} for user_id={user_id}")
 
-        if citations_data:
-            citation_repository.create_citations(user_id, citations_data)
+            if citations_data:
+                citation_repository.create_citations(user_id, citations_data)
+                
+                # Format citations for frontend
+                frontend_citations = []
+                for c in citations_data:
+                    frontend_citations.append({
+                        "document_id": str(c["document_id"]),
+                        "chunk_id": str(c["chunk_id"]),
+                        "page_number": c.get("page_number"),
+                        "relevance_score": c["relevance_score"]
+                    })
+                yield {"type": "citations", "citations": frontend_citations}
 
 
 rag_service = RagService()

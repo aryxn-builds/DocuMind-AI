@@ -4,10 +4,18 @@ import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Send, Bot, User } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
+type Citation = {
+  document_id: string
+  chunk_id: string
+  page_number?: number
+  relevance_score: number
+}
+
 type Message = {
   id?: string
   role: 'user' | 'assistant'
   content: string
+  citations?: Citation[]
 }
 
 interface ChatPanelProps {
@@ -104,12 +112,23 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                 }
                 try {
                   const parsed = JSON.parse(data)
-                  if (parsed.content) {
+                  if (parsed.type === 'citations') {
                     setMessages(prev => {
                       const newMessages = [...prev]
-                      const last = newMessages[newMessages.length - 1]
+                      const lastIndex = newMessages.length - 1
+                      const last = newMessages[lastIndex]
                       if (last.role === 'assistant') {
-                        last.content += parsed.content
+                        newMessages[lastIndex] = { ...last, citations: parsed.citations }
+                      }
+                      return newMessages
+                    })
+                  } else if (parsed.type === 'chunk' || parsed.content) {
+                    setMessages(prev => {
+                      const newMessages = [...prev]
+                      const lastIndex = newMessages.length - 1
+                      const last = newMessages[lastIndex]
+                      if (last.role === 'assistant') {
+                        newMessages[lastIndex] = { ...last, content: last.content + (parsed.content || '') }
                       }
                       return newMessages
                     })
@@ -118,9 +137,10 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                     // with an informative message so the user sees feedback.
                     setMessages(prev => {
                       const newMessages = [...prev]
-                      const last = newMessages[newMessages.length - 1]
+                      const lastIndex = newMessages.length - 1
+                      const last = newMessages[lastIndex]
                       if (last.role === 'assistant' && last.content === '') {
-                        last.content = `⚠ ${parsed.error}`
+                        newMessages[lastIndex] = { ...last, content: `⚠ ${parsed.error}` }
                       }
                       return newMessages
                     })
@@ -163,7 +183,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
             </div>
             <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1">How can I help you today?</h4>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-[250px]">
-              Ask me anything about the content of this document and I'll find the answers.
+              Ask me anything about the content of this document and I&apos;ll find the answers.
             </p>
           </div>
         ) : (
@@ -183,8 +203,25 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                 }`}
               >
                 {msg.role === 'assistant' ? (
-                  <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                    <ReactMarkdown>{msg.content || '...'}</ReactMarkdown>
+                  <div className="flex flex-col gap-4">
+                    <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+                      <ReactMarkdown>{msg.content || '...'}</ReactMarkdown>
+                    </div>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+                        <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                          Sources
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          {msg.citations.map((c, idx) => (
+                            <div key={idx} className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0"></span>
+                              <span>Source {idx + 1} {c.page_number ? `(Page ${c.page_number})` : ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="whitespace-pre-wrap break-words">{msg.content}</div>
@@ -205,13 +242,19 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
       {/* Input Form */}
       <div className="shrink-0 p-4 bg-white dark:bg-zinc-950">
         <form onSubmit={handleSubmit} className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100 transition-shadow">
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSubmit(e as any)
+              }
+            }}
             disabled={!conversationId || isStreaming}
             placeholder={isStreaming ? "AI is typing..." : "Ask a question..."}
-            className="flex-1 min-h-[44px] bg-transparent px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
+            className="flex-1 min-h-[44px] max-h-[150px] resize-none bg-transparent px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
+            rows={1}
           />
           <button
             type="submit"

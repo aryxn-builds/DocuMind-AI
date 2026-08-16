@@ -13,7 +13,7 @@ api_v1_router = APIRouter()
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
-from app.api.v1.endpoints import auth, documents, chat
+from app.api.v1.endpoints import auth, chat, documents
 
 # from app.api.v1.endpoints import collections
 api_v1_router.include_router(auth.router, prefix="", tags=["auth"])

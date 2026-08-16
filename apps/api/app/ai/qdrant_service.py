@@ -1,5 +1,4 @@
 import logging
-from typing import List, Tuple
 
 try:
     from qdrant_client import QdrantClient
@@ -7,8 +6,8 @@ try:
 except ImportError:
     pass
 
-from app.core.config import settings
 from app.ai.models import Chunk
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class QdrantService:
             logger.error(f"Failed to ensure Qdrant collection: {e}")
             raise
 
-    def upsert(self, chunks_with_vectors: List[Tuple[Chunk, List[float]]], user_id: str):
+    def upsert(self, chunks_with_vectors: list[tuple[Chunk, list[float]]], user_id: str):
         self._initialize()
         if not user_id:
             raise ValueError("user_id is mandatory for Qdrant upsert to enforce isolation.")

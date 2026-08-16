@@ -1,8 +1,8 @@
-import uuid
 import base64
+import uuid
 
-from app.ai.models import NormalizedDocument, DocumentBlock, BlockType
 from app.ai.adapters.base import BaseAdapter
+from app.ai.models import BlockType, DocumentBlock, NormalizedDocument
 
 
 class ImageAdapter(BaseAdapter):

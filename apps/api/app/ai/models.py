@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 
 class BlockType(str, Enum):
@@ -27,12 +27,12 @@ class DocumentBlock:
     block_id: str
     block_type: BlockType
     content: str
-    page_number: Optional[int] = None
-    section_path: List[str] = field(default_factory=list)
-    bbox: Optional[BoundingBox] = None
-    table_data: Optional[List[List[str]]] = None
-    image_ref: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    page_number: int | None = None
+    section_path: list[str] = field(default_factory=list)
+    bbox: BoundingBox | None = None
+    table_data: list[list[str]] | None = None
+    image_ref: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -43,8 +43,8 @@ class NormalizedDocument:
     source_mime_type: str
     page_count: int
     title: str
-    blocks: List[DocumentBlock]
-    processing_metadata: Dict[str, Any]
+    blocks: list[DocumentBlock]
+    processing_metadata: dict[str, Any]
 
 
 @dataclass
@@ -55,10 +55,10 @@ class Chunk:
     chunk_index: int
     chunk_type: str
     content: str
-    page_number: Optional[int] = None
-    section_path: List[str] = field(default_factory=list)
-    bbox: Optional[BoundingBox] = None
-    table_data: Optional[List[List[str]]] = None
-    image_ref: Optional[str] = None
-    source_block_ids: List[str] = field(default_factory=list)
+    page_number: int | None = None
+    section_path: list[str] = field(default_factory=list)
+    bbox: BoundingBox | None = None
+    table_data: list[list[str]] | None = None
+    image_ref: str | None = None
+    source_block_ids: list[str] = field(default_factory=list)
     content_preview: str = ""

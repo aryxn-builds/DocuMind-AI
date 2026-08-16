@@ -1,22 +1,21 @@
 import json
 import logging
 import uuid
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.core.security import get_current_user
-from app.repositories import conversation_repository, message_repository, citation_repository
+from app.repositories import citation_repository, conversation_repository, message_repository
 from app.schemas.chat import (
     ConversationCreate,
     ConversationResponse,
+    RagRequest,
     SearchRequest,
     SearchResponse,
-    RagRequest,
 )
-from app.services.retrieval_service import retrieval_service
 from app.services.rag_service import rag_service
+from app.services.retrieval_service import retrieval_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ def create_conversation(
     convo_data["messages"] = []
     return convo_data
 
-@router.get("/conversations", response_model=List[ConversationResponse])
+@router.get("/conversations", response_model=list[ConversationResponse])
 def list_conversations(user_id: str = Depends(get_current_user)):
     convos = conversation_repository.list_conversations(user_id)
 

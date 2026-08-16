@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import List
 
 from supabase import Client, create_client
 
@@ -22,8 +21,8 @@ def _client() -> Client:
 
 def create_citations(
     user_id: str,
-    citations_data: List[dict]
-) -> List[dict]:
+    citations_data: list[dict]
+) -> list[dict]:
     """
     Bulk inserts citations. 
     citations_data should include: message_id, document_id, chunk_id, page_number, excerpt, relevance_score.
@@ -48,7 +47,7 @@ def create_citations(
     response = _client().table(TABLE).insert(records).execute()
     return response.data or []
 
-def get_citations_for_message(message_id: uuid.UUID, user_id: str) -> List[dict]:
+def get_citations_for_message(message_id: uuid.UUID, user_id: str) -> list[dict]:
     """Gets citations for a specific message, filtered by user_id."""
     response = (
         _client()

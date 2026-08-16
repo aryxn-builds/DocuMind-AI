@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, List
 
 from supabase import Client, create_client
 
@@ -24,7 +23,7 @@ def create_conversation(
     *,
     user_id: str,
     title: str = "New Conversation",
-    document_id: Optional[uuid.UUID] = None
+    document_id: uuid.UUID | None = None
 ) -> dict:
     """Creates a new conversation for the user."""
     conversation_id = str(uuid.uuid4())
@@ -41,7 +40,7 @@ def create_conversation(
 
     return response.data[0]
 
-def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> Optional[dict]:
+def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | None:
     """Fetches a conversation by ID, strictly filtered by user_id."""
     response = (
         _client()
@@ -56,7 +55,7 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> Optional
         return None
     return response.data if hasattr(response, 'data') else response.get('data')
 
-def list_conversations(user_id: str, limit: int = 20) -> List[dict]:
+def list_conversations(user_id: str, limit: int = 20) -> list[dict]:
     """Lists recent conversations for a user."""
     response = (
         _client()

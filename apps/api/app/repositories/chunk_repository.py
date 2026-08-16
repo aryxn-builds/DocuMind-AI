@@ -1,9 +1,9 @@
 import logging
-from typing import List
 
 from supabase import Client, create_client
-from app.core.config import settings
+
 from app.ai.models import Chunk
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ TABLE = "document_chunks"
 def _client() -> Client:
     return create_client(settings.supabase_url, settings.supabase_service_role_key)
 
-def insert_chunks(chunks: List[Chunk]):
+def insert_chunks(chunks: list[Chunk]):
     if not chunks:
         return
 
@@ -56,13 +56,13 @@ def delete_by_document(document_id: str, user_id: str):
         logger.error(f"Failed to delete chunks for document {document_id}: {e}")
         raise
 
-def get_chunks_by_ids(chunk_ids: List[str], user_id: str) -> List[dict]:
+def get_chunks_by_ids(chunk_ids: list[str], user_id: str) -> list[dict]:
     """
     Fetches chunks by their IDs, enforcing user ownership.
     """
     if not chunk_ids:
         return []
-    
+
     response = (
         _client()
         .table(TABLE)

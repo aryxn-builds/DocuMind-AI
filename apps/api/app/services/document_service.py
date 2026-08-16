@@ -10,8 +10,9 @@ import logging
 import re
 import uuid
 
-from fastapi import HTTPException, status, BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException, status
 
+from app.ai.processing_orchestrator import ProcessingOrchestrator
 from app.repositories import document_repository, job_repository
 from app.schemas.document import (
     ALLOWED_MIME_TYPES,
@@ -24,7 +25,6 @@ from app.schemas.document import (
     SignedUrlResponse,
 )
 from app.services import storage_service
-from app.ai.processing_orchestrator import ProcessingOrchestrator
 
 logger = logging.getLogger(__name__)
 

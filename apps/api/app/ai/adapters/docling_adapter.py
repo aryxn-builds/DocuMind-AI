@@ -1,19 +1,18 @@
-import tempfile
 import os
+import tempfile
 
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
 
-import uuid
 import logging
-from typing import List
+import uuid
 
 try:
     from docling.document_converter import DocumentConverter
 except ImportError:
     pass  # For environments where docling isn't installed yet
 
-from app.ai.models import NormalizedDocument, DocumentBlock, BlockType, BoundingBox
 from app.ai.adapters.base import BaseAdapter
+from app.ai.models import BlockType, BoundingBox, DocumentBlock, NormalizedDocument
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class DoclingAdapter(BaseAdapter):
             result = converter.convert(tmp_path)
             doc = result.document
 
-            blocks: List[DocumentBlock] = []
+            blocks: list[DocumentBlock] = []
 
             # We use iterate_items() to traverse the document in reading order
             for item, level in doc.iterate_items():

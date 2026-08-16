@@ -1,8 +1,7 @@
-import uuid
 import re
-from typing import List
+import uuid
 
-from app.ai.models import NormalizedDocument, Chunk, BlockType
+from app.ai.models import BlockType, Chunk, NormalizedDocument
 
 
 class Chunker:
@@ -11,8 +10,8 @@ class Chunker:
     OVERLAP_SENTENCES = 2
     MIN_CHUNK_CHARS = 50
 
-    def chunk(self, document: NormalizedDocument) -> List[Chunk]:
-        chunks: List[Chunk] = []
+    def chunk(self, document: NormalizedDocument) -> list[Chunk]:
+        chunks: list[Chunk] = []
         chunk_index = 0
 
         current_heading_prefix = ""

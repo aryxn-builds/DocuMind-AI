@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncGenerator, Dict, Any, List
+from collections.abc import AsyncGenerator
+from typing import Any
 
 try:
     import google.generativeai as genai
@@ -12,8 +13,8 @@ try:
 except ImportError:
     GroqAPIStatusError = Exception  # fallback if groq not installed
 
-from app.core.config import settings
 from app.ai.tracer import observe
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class AIGateway:
         self.gemini_model = settings.gemini_chat_model
 
     @observe(name="ai_gateway.stream_chat", capture_input=False, capture_output=False)
-    async def stream_chat(self, messages: List[Dict[str, Any]]) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream_chat(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
         """
         Streams a chat completion using the primary provider, falling back to Gemini
         only on network / server-side failures — not on 4xx client errors.
@@ -75,7 +76,7 @@ class AIGateway:
 
         raise RuntimeError("No LLM providers available or all providers failed.")
 
-    async def _stream_groq(self, messages: List[Dict[str, Any]]) -> AsyncGenerator[Dict[str, Any], None]:
+    async def _stream_groq(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
         stream = await self.groq_client.chat.completions.create(
             messages=messages,
             model=self.groq_model,
@@ -91,7 +92,7 @@ class AIGateway:
                     "provider": "groq"
                 }
 
-    async def _stream_gemini(self, messages: List[Dict[str, Any]]) -> AsyncGenerator[Dict[str, Any], None]:
+    async def _stream_gemini(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
         gemini_messages = []
         system_instruction = None
         for msg in messages:

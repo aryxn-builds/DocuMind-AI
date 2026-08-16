@@ -1,15 +1,15 @@
-import logging
 import asyncio
+import logging
 
-from app.core.config import settings
-from app.repositories import job_repository, chunk_repository, document_repository
-from app.services import storage_service
 from app.ai.adapters.factory import get_adapter
-from app.ai.vision_service import VisionEnrichmentService
 from app.ai.chunker import Chunker
 from app.ai.embedding_service import EmbeddingService
 from app.ai.qdrant_service import QdrantService
 from app.ai.tracer import observe
+from app.ai.vision_service import VisionEnrichmentService
+from app.core.config import settings
+from app.repositories import chunk_repository, document_repository, job_repository
+from app.services import storage_service
 
 logger = logging.getLogger(__name__)
 

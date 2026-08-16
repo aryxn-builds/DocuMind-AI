@@ -1,14 +1,14 @@
+import base64
 import logging
 import time
-import base64
 
 try:
     import google.generativeai as genai
 except ImportError:
     pass
 
+from app.ai.models import BlockType, NormalizedDocument
 from app.core.config import settings
-from app.ai.models import NormalizedDocument, BlockType
 
 logger = logging.getLogger(__name__)
 

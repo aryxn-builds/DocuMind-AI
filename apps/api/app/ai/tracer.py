@@ -1,7 +1,7 @@
-import logging
 import functools
 import inspect
-from typing import Callable
+import logging
+from collections.abc import Callable
 
 try:
     from langfuse import Langfuse

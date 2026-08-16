@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { signup } from '../login/actions'
 import { ArrowLeft } from 'lucide-react'
+import { SubmitButton } from '@/components/SubmitButton'
 
 export default async function SignupPage({
   searchParams,
@@ -98,12 +99,9 @@ export default async function SignupPage({
                 </div>
               )}
 
-              <button
-                type="submit"
-                className="mt-2 w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors shadow-sm"
-              >
+              <SubmitButton loadingText="Signing up...">
                 Sign Up
-              </button>
+              </SubmitButton>
             </form>
 
             <div className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">

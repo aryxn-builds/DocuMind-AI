@@ -4,7 +4,7 @@ DocuMind AI — Documents Endpoints.
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.core.security import get_current_user
 from app.schemas.document import (

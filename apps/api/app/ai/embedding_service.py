@@ -1,5 +1,4 @@
 import logging
-from typing import List, Tuple
 
 try:
     import numpy as np
@@ -7,9 +6,8 @@ try:
 except ImportError:
     pass
 
-from app.core.config import settings
 from app.ai.models import Chunk
-
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ class EmbeddingService:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(EmbeddingService, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
 
@@ -31,7 +29,7 @@ class EmbeddingService:
         self.batch_size = settings.embedding_batch_size
         self.model = None
 
-    def embed(self, chunks: List[Chunk]) -> List[Tuple[Chunk, List[float]]]:
+    def embed(self, chunks: list[Chunk]) -> list[tuple[Chunk, list[float]]]:
         """
         Embeds a list of chunks.
         Returns a list of tuples containing the original Chunk and its L2-normalized embedding vector.
@@ -62,7 +60,7 @@ class EmbeddingService:
             logger.error(f"Failed to generate embeddings: {e}")
             raise RuntimeError(f"Embedding generation failed: {e}") from e
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """
         Embeds a single query string for search.
         """

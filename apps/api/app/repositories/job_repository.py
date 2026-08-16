@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from supabase import Client, create_client
 
@@ -80,7 +80,7 @@ def claim_job(job_id: str) -> dict | None:
     Atomically claim a queued job by setting it to processing.
     Returns the updated job if successful, or None if already claimed/failed.
     """
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     response = (
         _client()
         .table(TABLE)
@@ -102,7 +102,7 @@ def update_job_progress(job_id: str, progress: float, status: str = "processing"
 
 def fail_job(job_id: str, stage: str, message: str, retry_count: int) -> None:
     """Marks a job as failed and records error details."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     error_details = {
         "stage": stage,
         "message": message,
@@ -117,7 +117,7 @@ def fail_job(job_id: str, stage: str, message: str, retry_count: int) -> None:
 
 def complete_job(job_id: str) -> None:
     """Marks a job as successfully completed."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     _client().table(TABLE).update({
         "status": "completed",
         "progress": 1.0,
@@ -127,7 +127,7 @@ def complete_job(job_id: str) -> None:
 
 def find_stale_processing_jobs(older_than_minutes: int) -> list[dict]:
     """Finds jobs stuck in processing state for longer than the specified minutes."""
-    threshold = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    threshold = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
 
     response = (
         _client()
@@ -141,7 +141,7 @@ def find_stale_processing_jobs(older_than_minutes: int) -> list[dict]:
 
 def fail_stale_jobs(message: str) -> int:
     """Marks all 'processing' or 'queued' jobs as failed during process startup."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     count = 0
 
     for status in ["processing", "queued"]:

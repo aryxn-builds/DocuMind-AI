@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, List
 
 from supabase import Client, create_client
 
@@ -26,9 +25,9 @@ def create_message(
     conversation_id: uuid.UUID,
     role: str,
     content: str,
-    tokens_used: Optional[int] = None,
-    provider: Optional[str] = None,
-    model: Optional[str] = None
+    tokens_used: int | None = None,
+    provider: str | None = None,
+    model: str | None = None
 ) -> dict:
     """Creates a new message in a conversation. Enforces user_id ownership."""
     message_id = str(uuid.uuid4())
@@ -55,7 +54,7 @@ def create_message(
 
     return response.data[0]
 
-def list_messages_for_conversation(conversation_id: uuid.UUID, user_id: str) -> List[dict]:
+def list_messages_for_conversation(conversation_id: uuid.UUID, user_id: str) -> list[dict]:
     """Lists all messages for a conversation, ordered chronologically, filtered by user_id."""
     response = (
         _client()

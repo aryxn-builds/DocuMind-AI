@@ -28,14 +28,24 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+  const handleScroll = () => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+      setAutoScroll(scrollHeight - scrollTop - clientHeight < 100)
+    }
+  }
+
   useEffect(() => {
-    // Scroll to bottom when messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (autoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, autoScroll])
 
   useEffect(() => {
     // Create or fetch conversation
@@ -175,7 +185,11 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+      <div 
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6"
+      >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
             <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-4">
@@ -204,22 +218,29 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
               >
                 {msg.role === 'assistant' ? (
                   <div className="flex flex-col gap-4">
-                    <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                      <ReactMarkdown>{msg.content || '...'}</ReactMarkdown>
-                    </div>
+                    {msg.content === '' && isStreaming && i === messages.length - 1 ? (
+                      <div className="flex items-center gap-1.5 h-6">
+                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"></span>
+                      </div>
+                    ) : (
+                      <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    )}
                     {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-2 border-t border-zinc-200 dark:border-zinc-800 pt-3">
-                        <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                          Sources
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          {msg.citations.map((c, idx) => (
-                            <div key={idx} className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0"></span>
-                              <span>Source {idx + 1} {c.page_number ? `(Page ${c.page_number})` : ''}</span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="mt-2 border-t border-zinc-200 dark:border-zinc-800 pt-3 flex flex-wrap gap-2">
+                        {msg.citations.map((c, idx) => (
+                          <div 
+                            key={idx} 
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-200/50 dark:bg-zinc-800 rounded text-[11px] font-medium text-zinc-600 dark:text-zinc-400 cursor-default"
+                            title={`Document source (Score: ${c.relevance_score.toFixed(2)})`}
+                          >
+                            <span>[{idx + 1}]</span>
+                            <span>{c.page_number ? `Page ${c.page_number}` : 'Document source'}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -248,7 +269,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                handleSubmit(e as any)
+                handleSubmit(e)
               }
             }}
             disabled={!conversationId || isStreaming}

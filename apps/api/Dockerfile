@@ -1,4 +1,4 @@
-﻿FROM python:3.12-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -16,6 +16,7 @@ COPY . .
 
 ENV PYTHONPATH=/app
 ENV TORCHDYNAMO_DISABLE=1
+ENV MALLOC_ARENA_MAX=2
 
 EXPOSE 8000
 

@@ -2,11 +2,6 @@ import base64
 import logging
 import time
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    pass
-
 from app.ai.models import BlockType, NormalizedDocument
 from app.core.config import settings
 
@@ -14,8 +9,6 @@ logger = logging.getLogger(__name__)
 
 class VisionEnrichmentService:
     def __init__(self):
-        if settings.gemini_api_key:
-            genai.configure(api_key=settings.gemini_api_key)
         self.model_name = settings.gemini_vision_model
 
     def enrich(self, document: NormalizedDocument) -> NormalizedDocument:
@@ -24,7 +17,10 @@ class VisionEnrichmentService:
             self._fill_placeholders(document)
             return document
 
-        model = genai.GenerativeModel(self.model_name)
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.gemini_api_key)
         calls_made = 0
 
         for block in document.blocks:
@@ -47,12 +43,13 @@ class VisionEnrichmentService:
 
                         for attempt in range(retries):
                             try:
-                                # The instruction is a fixed system prompt. The document text is NEVER injected.
-                                # The image is passed as a separate data attachment.
-                                response = model.generate_content([
-                                    "Describe the contents of the attached image in detail. Focus on text, data, charts, and structural diagrams.",
-                                    {"mime_type": mime_type, "data": image_bytes}
-                                ])
+                                response = client.models.generate_content(
+                                    model=self.model_name,
+                                    contents=[
+                                        "Describe the contents of the attached image in detail. Focus on text, data, charts, and structural diagrams.",
+                                        types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                                    ]
+                                )
                                 page_info = f", Page {block.page_number}" if block.page_number else ""
                                 block.content = f"[Image{page_info}]: {response.text}"
                                 calls_made += 1

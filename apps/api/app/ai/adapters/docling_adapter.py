@@ -6,10 +6,6 @@ os.environ["TORCHDYNAMO_DISABLE"] = "1"
 import logging
 import uuid
 
-try:
-    from docling.document_converter import DocumentConverter
-except ImportError:
-    pass  # For environments where docling isn't installed yet
 
 from app.ai.adapters.base import BaseAdapter
 from app.ai.models import BlockType, BoundingBox, DocumentBlock, NormalizedDocument
@@ -27,6 +23,7 @@ class DoclingAdapter(BaseAdapter):
             tmp_path = tmp.name
 
         try:
+            from docling.document_converter import DocumentConverter
             converter = DocumentConverter()
             result = converter.convert(tmp_path)
             doc = result.document

@@ -1,10 +1,6 @@
 import logging
 
-try:
-    import numpy as np
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    pass
+
 
 from app.ai.models import Chunk
 from app.core.config import settings
@@ -40,6 +36,7 @@ class EmbeddingService:
         if self.model is None:
             logger.info(f"Loading embedding model: {self.model_name}")
             try:
+                from sentence_transformers import SentenceTransformer
                 self.model = SentenceTransformer(self.model_name)
             except Exception as e:
                 logger.error(f"Failed to load embedding model {self.model_name}: {e}")
@@ -67,6 +64,7 @@ class EmbeddingService:
         if self.model is None:
             logger.info(f"Loading embedding model: {self.model_name}")
             try:
+                from sentence_transformers import SentenceTransformer
                 self.model = SentenceTransformer(self.model_name)
             except Exception as e:
                 logger.error(f"Failed to load embedding model {self.model_name}: {e}")

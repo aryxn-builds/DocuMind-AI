@@ -44,6 +44,10 @@ class _TracerFactory:
         self._initialized = True
 
         if settings.langfuse_public_key and settings.langfuse_secret_key and settings.langfuse_host:
+            if Langfuse is None:
+                logger.error("Langfuse credentials are set but the package is not installed.")
+                self.langfuse = None
+                return
             try:
                 # We simply instantiate to verify credentials are ok,
                 # but the @observe decorator uses environment variables natively

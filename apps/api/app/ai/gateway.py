@@ -3,12 +3,6 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 try:
-    import google.generativeai as genai
-except ImportError:
-    pass
-
-try:
-    import groq
     from groq import APIStatusError as GroqAPIStatusError
 except ImportError:
     GroqAPIStatusError = Exception  # fallback if groq not installed
@@ -36,13 +30,9 @@ class AIGateway:
         self.groq_api_key = settings.groq_api_key
         self.gemini_api_key = settings.gemini_api_key
 
-        if self.groq_api_key:
-            self.groq_client = groq.AsyncGroq(api_key=self.groq_api_key)
-        else:
-            self.groq_client = None
+        self.groq_client = None
+        self.gemini_client = None
 
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
         self.groq_model = settings.groq_model
         self.gemini_model = settings.gemini_chat_model
 
@@ -53,18 +43,17 @@ class AIGateway:
         only on network / server-side failures — not on 4xx client errors.
         Yields dictionaries with {"content": str, "model": str, "provider": str}.
         """
-        if self.groq_client:
+        if self.groq_api_key:
             try:
                 logger.info("Attempting primary LLM provider (Groq)")
                 async for chunk in self._stream_groq(messages):
                     yield chunk
                 return
             except GroqAPIStatusError as e:
-                if e.status_code in _GROQ_NO_RETRY_STATUS:
-                    # Client-side error — re-raise immediately, do NOT fall back
-                    logger.error(f"Groq rejected request ({e.status_code}): {e}")
+                if getattr(e, 'status_code', 500) in _GROQ_NO_RETRY_STATUS:
+                    logger.error(f"Groq rejected request ({getattr(e, 'status_code', 500)}): {e}")
                     raise
-                logger.error(f"Groq server/network error ({e.status_code}), attempting Gemini fallback: {e}")
+                logger.error(f"Groq server/network error, attempting Gemini fallback: {e}")
             except Exception as e:
                 logger.error(f"Groq unexpected error, attempting Gemini fallback: {e}")
 
@@ -77,6 +66,9 @@ class AIGateway:
         raise RuntimeError("No LLM providers available or all providers failed.")
 
     async def _stream_groq(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
+        import groq
+        if not self.groq_client:
+            self.groq_client = groq.AsyncGroq(api_key=self.groq_api_key)
         stream = await self.groq_client.chat.completions.create(
             messages=messages,
             model=self.groq_model,
@@ -93,25 +85,29 @@ class AIGateway:
                 }
 
     async def _stream_gemini(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
+        from google import genai
+        from google.genai import types
+
+        if not self.gemini_client:
+            self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+
         gemini_messages = []
         system_instruction = None
         for msg in messages:
             if msg["role"] == "system":
                 system_instruction = msg["content"]
             elif msg["role"] == "user":
-                gemini_messages.append({"role": "user", "parts": [msg["content"]]})
+                gemini_messages.append({"role": "user", "parts": [{"text": msg["content"]}]})
             elif msg["role"] == "assistant":
-                gemini_messages.append({"role": "model", "parts": [msg["content"]]})
+                gemini_messages.append({"role": "model", "parts": [{"text": msg["content"]}]})
 
-        model_instance = genai.GenerativeModel(
-            model_name=self.gemini_model,
-            system_instruction=system_instruction
-        )
-
-        response = await model_instance.generate_content_async(
-            gemini_messages,
-            stream=True,
-            generation_config=genai.types.GenerationConfig(temperature=0.1)
+        response = await self.gemini_client.aio.models.generate_content_stream(
+            model=self.gemini_model,
+            contents=gemini_messages,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.1
+            )
         )
 
         async for chunk in response:

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ==========================================================================
    DocuMind AI — Global Design System Tokens

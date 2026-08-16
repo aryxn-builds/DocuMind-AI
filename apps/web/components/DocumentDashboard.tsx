@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
+import { Upload, FileText, Trash2, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 
 type Document = {
   id: string
@@ -167,8 +168,8 @@ export function DocumentDashboard() {
   }
 
   return (
-    <div className="space-y-6 mt-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Your Documents</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Upload and manage your documents for processing.</p>
@@ -185,82 +186,133 @@ export function DocumentDashboard() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 disabled:pointer-events-none disabled:opacity-50 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-4 py-2 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90"
+            className="inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 disabled:pointer-events-none disabled:opacity-50 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 h-10 px-6 py-2 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-sm"
           >
-            {isUploading ? 'Uploading...' : 'Upload Document'}
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Upload Document
+              </>
+            )}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-md bg-red-50 text-red-900 border border-red-200 dark:bg-red-950/50 dark:text-red-200 dark:border-red-900/50 text-sm">
-          {error}
+        <div className="p-4 rounded-xl bg-red-50 text-red-900 border border-red-200 dark:bg-red-950/50 dark:text-red-200 dark:border-red-900/50 text-sm flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading ? (
-        <div className="flex justify-center p-8 text-sm text-zinc-500">Loading documents...</div>
+        <div className="flex flex-col items-center justify-center p-12 text-zinc-500">
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-400 mb-4" />
+          <p className="text-sm font-medium">Loading your documents...</p>
+        </div>
       ) : documents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">No documents yet.<br/>Upload one to get started.</p>
+        <div className="flex flex-col items-center justify-center p-12 py-20 border-2 border-dashed rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-6">
+            <FileText className="w-8 h-8 text-zinc-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">No documents yet</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mb-6">
+            Upload your first document to start extracting intelligence and asking questions.
+          </p>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors bg-white border border-zinc-200 text-zinc-900 hover:bg-zinc-50 h-10 px-6 py-2 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <Upload className="w-4 h-4" />
+            Upload your first document
+          </button>
         </div>
       ) : (
-        <div className="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <th className="px-6 py-3 font-medium">Name</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Size</th>
-                <th className="px-6 py-3 font-medium">Date</th>
-                <th className="px-6 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map(doc => (
-                <tr key={doc.id} className="border-b border-zinc-200 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">
-                    {doc.original_filename}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border capitalize ${
-                      doc.status === 'ready' 
-                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-900'
-                        : doc.status === 'failed'
-                        ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900'
-                        : doc.status === 'processing' || doc.status === 'queued'
-                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-900'
-                        : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
-                    }`}>
-                      {doc.status === 'processing' || doc.status === 'queued' ? '⟳ ' : ''}{doc.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-500">
-                    {formatBytes(doc.file_size_bytes)}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-500 whitespace-nowrap">
-                    {new Date(doc.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                    {doc.status === 'ready' && (
-                      <Link 
-                        href={`/dashboard/documents/${doc.id}`}
-                        className="text-zinc-900 hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400 font-medium text-xs border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 bg-white dark:bg-zinc-900"
-                      >
-                        Ask AI
-                      </Link>
-                    )}
-                    <button 
-                      onClick={() => handleDelete(doc.id)}
-                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left whitespace-nowrap">
+              <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
+                <tr>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Name</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Status</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Size</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider">Date</th>
+                  <th className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {documents.map(doc => (
+                  <tr key={doc.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-zinc-500" />
+                        </div>
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100 truncate max-w-[200px] sm:max-w-xs md:max-w-md">
+                          {doc.original_filename}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase border ${
+                        doc.status === 'ready' 
+                          ? 'bg-green-50 text-green-700 border-green-200/60 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20'
+                          : doc.status === 'failed'
+                          ? 'bg-red-50 text-red-700 border-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20'
+                          : doc.status === 'processing' || doc.status === 'queued'
+                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200/60 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20'
+                          : 'bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700'
+                      }`}>
+                        {(doc.status === 'processing' || doc.status === 'queued') && (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        )}
+                        {doc.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400 font-medium">
+                      {formatBytes(doc.file_size_bytes)}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400">
+                      {new Date(doc.created_at).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {doc.status === 'ready' ? (
+                          <Link 
+                            href={`/dashboard/documents/${doc.id}`}
+                            className="inline-flex items-center gap-1.5 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium text-xs rounded-full px-4 py-2 transition-colors shadow-sm"
+                          >
+                            Ask AI <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        ) : (doc.status === 'processing' || doc.status === 'queued') ? (
+                          <span className="inline-flex items-center bg-zinc-100 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-600 font-medium text-xs rounded-full px-4 py-2 cursor-not-allowed border border-transparent">
+                            Processing...
+                          </span>
+                        ) : null}
+                        
+                        <button 
+                          onClick={() => handleDelete(doc.id)}
+                          className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/30 rounded-full transition-colors ml-2"
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

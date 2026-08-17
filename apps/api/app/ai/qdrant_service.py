@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class QdrantService:
     COLLECTION_NAME = "document_chunks"
-    # Gemini embedding-004 produces 768-dimensional vectors.
+    # Gemini gemini-embedding-2 produces 768-dimensional vectors.
     # BREAKING CHANGE from 384 (sentence-transformers bge-small) — collection must be recreated.
     VECTOR_SIZE = 768
 

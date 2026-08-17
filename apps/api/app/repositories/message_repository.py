@@ -49,10 +49,10 @@ def create_message(
     }
 
     response = _client().table(TABLE).insert(record).execute()
-    if not response.data:
+    if not getattr(response, "data", None):
         raise RuntimeError("Failed to insert message record")
 
-    return response.data[0]
+    return getattr(response, "data", [None])[0]
 
 def list_messages_for_conversation(conversation_id: uuid.UUID, user_id: str) -> list[dict]:
     """Lists all messages for a conversation, ordered chronologically, filtered by user_id."""
@@ -65,4 +65,4 @@ def list_messages_for_conversation(conversation_id: uuid.UUID, user_id: str) -> 
         .order("created_at", desc=False)
         .execute()
     )
-    return response.data or []
+    return getattr(response, "data", []) or []

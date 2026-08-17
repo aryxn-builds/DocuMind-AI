@@ -31,7 +31,7 @@ class PdfAdapter(BaseAdapter):
 
     def parse(self, file_bytes: bytes) -> NormalizedDocument:
         try:
-            import fitz  # PyMuPDF
+            import pymupdf as fitz  # PyMuPDF
         except ImportError as exc:
             raise RuntimeError(
                 "PyMuPDF (pymupdf) is not installed. Add 'pymupdf>=1.24.0' to requirements.txt."

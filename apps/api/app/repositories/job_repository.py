@@ -46,7 +46,7 @@ def insert_job(
 
     response = _client().table(TABLE).insert(record).execute()
 
-    if not response.data:
+    if not getattr(response, "data", None):
         raise RuntimeError(f"Failed to insert processing_job record: {response}")
 
     logger.info(
@@ -57,7 +57,7 @@ def insert_job(
             "job_id": record["id"],
         },
     )
-    return response.data[0]
+    return getattr(response, "data", [None])[0]
 
 
 def get_job_by_document(document_id: uuid.UUID, user_id: str) -> dict | None:
@@ -72,7 +72,7 @@ def get_job_by_document(document_id: uuid.UUID, user_id: str) -> dict | None:
         .limit(1)
         .execute()
     )
-    return response.data[0] if response.data else None
+    return getattr(response, "data", [None])[0] if getattr(response, "data", []) else None
 
 
 def claim_job(job_id: str) -> dict | None:
@@ -90,8 +90,8 @@ def claim_job(job_id: str) -> dict | None:
         .execute()
     )
 
-    if response.data:
-        return response.data[0]
+    if getattr(response, "data", None):
+        return getattr(response, "data", [None])[0]
     return None
 
 
@@ -170,10 +170,10 @@ def fail_stale_jobs(message: str) -> int:
     for status in ["processing", "queued"]:
         # Select jobs first so we know which documents to update
         response = _client().table(TABLE).select("id, document_id, user_id").eq("status", status).execute()
-        if not response.data:
+        if not getattr(response, "data", None):
             continue
 
-        for job in response.data:
+        for job in getattr(response, "data", []):
             # Update job status
             _client().table(TABLE).update({
                 "status": "failed",

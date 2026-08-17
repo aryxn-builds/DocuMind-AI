@@ -45,7 +45,7 @@ def create_citations(
         records.append(record)
 
     response = _client().table(TABLE).insert(records).execute()
-    return response.data or []
+    return getattr(response, "data", []) or []
 
 def get_citations_for_message(message_id: uuid.UUID, user_id: str) -> list[dict]:
     """Gets citations for a specific message, filtered by user_id."""
@@ -57,4 +57,4 @@ def get_citations_for_message(message_id: uuid.UUID, user_id: str) -> list[dict]
         .eq("user_id", user_id)
         .execute()
     )
-    return response.data or []
+    return getattr(response, "data", []) or []

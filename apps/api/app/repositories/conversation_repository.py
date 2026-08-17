@@ -35,10 +35,10 @@ def create_conversation(
     }
 
     response = _client().table(TABLE).insert(record).execute()
-    if not response.data:
+    if not getattr(response, "data", None):
         raise RuntimeError("Failed to insert conversation record")
 
-    return response.data[0]
+    return getattr(response, "data", [None])[0]
 
 def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | None:
     """Fetches a conversation by ID, strictly filtered by user_id."""
@@ -53,7 +53,7 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | N
     )
     if not response:
         return None
-    return response.data if hasattr(response, 'data') else response.get('data')
+    return getattr(response, "data", []) if hasattr(response, 'data') else response.get('data')
 
 def list_conversations(user_id: str, limit: int = 20) -> list[dict]:
     """Lists recent conversations for a user."""
@@ -66,4 +66,4 @@ def list_conversations(user_id: str, limit: int = 20) -> list[dict]:
         .limit(limit)
         .execute()
     )
-    return response.data or []
+    return getattr(response, "data", []) or []

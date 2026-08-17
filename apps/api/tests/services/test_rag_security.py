@@ -17,8 +17,8 @@ Verifies the security and behavioral properties required by Phase 9:
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -173,7 +173,8 @@ async def test_groq_4xx_no_gemini_fallback():
         pytest.skip("groq package not installed")
 
     import httpx
-    from app.ai.gateway import AIGateway, _GROQ_NO_RETRY_STATUS
+
+    from app.ai.gateway import _GROQ_NO_RETRY_STATUS, AIGateway
 
     for status_code in _GROQ_NO_RETRY_STATUS:
         gw = AIGateway()

@@ -1,8 +1,9 @@
+import json
 import os
 import sys
 import time
+
 import httpx
-import json
 from dotenv import load_dotenv
 
 load_dotenv('c:/Users/ay603/Desktop/DocuMind AI/apps/api/.env')
@@ -19,10 +20,11 @@ def get_token(email):
     return res.json()['access_token']
 
 import jwt
+
 try:
     token_a = get_token('adminA@documind.test')
     token_b = get_token('adminB@documind.test')
-    
+
     print('Token A payload:', jwt.decode(token_a, options={'verify_signature': False}))
 except Exception as e:
     print("Failed to get tokens:", e)

@@ -6,7 +6,6 @@ os.environ["TORCHDYNAMO_DISABLE"] = "1"
 import logging
 import uuid
 
-
 from app.ai.adapters.base import BaseAdapter
 from app.ai.models import BlockType, BoundingBox, DocumentBlock, NormalizedDocument
 

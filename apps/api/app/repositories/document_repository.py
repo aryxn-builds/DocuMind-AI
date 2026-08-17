@@ -53,7 +53,7 @@ def insert_document(
 
     response = _client().table(TABLE).insert(record).execute()
 
-    if not response.data:
+    if not getattr(response, "data", None):
         raise RuntimeError(f"Failed to insert document record: {response}")
 
     logger.info(
@@ -65,7 +65,7 @@ def insert_document(
             "file_size_bytes": file_size_bytes,
         },
     )
-    return response.data[0]
+    return getattr(response, "data", [None])[0]
 
 
 def get_document_by_id(document_id: uuid.UUID, user_id: str) -> dict | None:
@@ -82,7 +82,7 @@ def get_document_by_id(document_id: uuid.UUID, user_id: str) -> dict | None:
         .maybe_single()
         .execute()
     )
-    return response.data
+    return getattr(response, "data", [])
 
 
 def update_document_status(
@@ -99,7 +99,7 @@ def update_document_status(
         .eq("user_id", user_id)
         .execute()
     )
-    return response.data[0] if response.data else None
+    return getattr(response, "data", [None])[0] if getattr(response, "data", []) else None
 
 
 def update_document_metadata(
@@ -116,7 +116,7 @@ def update_document_metadata(
         .eq("user_id", user_id)
         .execute()
     )
-    return response.data[0] if response.data else None
+    return getattr(response, "data", [None])[0] if getattr(response, "data", []) else None
 
 
 def list_documents(
@@ -146,7 +146,7 @@ def list_documents(
         query = query.lt("created_at", cursor)
 
     response = query.execute()
-    return response.data or []
+    return getattr(response, "data", []) or []
 
 
 def delete_document(document_id: uuid.UUID, user_id: str) -> bool:
@@ -164,7 +164,7 @@ def delete_document(document_id: uuid.UUID, user_id: str) -> bool:
         .eq("user_id", user_id)
         .execute()
     )
-    deleted = bool(response.data)
+    deleted = bool(getattr(response, "data", []))
     if deleted:
         logger.info(
             "document.deleted_from_db",

@@ -28,10 +28,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Gemini embedding model to use.
-# text-embedding-004 is the stable model available on the v1beta API endpoint.
-# gemini-embedding-004 is only available on v1 (not v1beta) and returns 404 via the SDK.
-# Both produce 768-dimensional vectors — Qdrant collection size is unchanged.
-GEMINI_EMBEDDING_MODEL = "text-embedding-004"
+# gemini-embedding-2 is the official production model.
+# We explicitly specify output_dimensionality=768 to match Qdrant configuration.
+GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
 
 # Maximum texts per batch_embed_contents call (Gemini API limit: 250).
 GEMINI_BATCH_LIMIT = 100  # conservative — keeps response size manageable
@@ -118,24 +117,36 @@ class EmbeddingService:
                         contents=texts,
                         config=genai_types.EmbedContentConfig(
                             task_type="RETRIEVAL_DOCUMENT",
+                            output_dimensionality=768,
                         ),
                     )
                     embeddings = response.embeddings
+                    if not embeddings:
+                        raise RuntimeError("Gemini returned no embeddings")
                     if len(embeddings) != len(batch):
                         raise RuntimeError(
                             f"Gemini returned {len(embeddings)} embeddings for {len(batch)} texts."
                         )
+
+                    logger.info(
+                        f"[EMBEDDING] model={self.model_name} requested_dimension=768 batch_size={len(batch)}"
+                    )
+
                     for chunk, emb in zip(batch, embeddings, strict=True):
                         vector = emb.values
                         if not vector:
                             raise RuntimeError(
                                 f"Gemini returned empty embedding for chunk {chunk.chunk_id}"
                             )
+                        if len(vector) != 768:
+                            raise RuntimeError(
+                                f"Invalid embedding dimension: {len(vector)}, expected 768"
+                            )
                         result.append((chunk, list(vector)))
 
+                    logger.info("[EMBEDDING] dimension_validation=passed")
                     logger.info(
-                        f"[EMBEDDING] batch completed "
-                        f"batch_start={batch_start} vectors={len(batch)}"
+                        f"[EMBEDDING] batch_completed vectors={len(batch)}"
                     )
                     last_exc = None
                     break
@@ -177,11 +188,14 @@ class EmbeddingService:
                     contents=[text],
                     config=genai_types.EmbedContentConfig(
                         task_type="RETRIEVAL_QUERY",
+                        output_dimensionality=768,
                     ),
                 )
                 vector = response.embeddings[0].values
                 if not vector:
                     raise RuntimeError("Gemini returned empty query embedding.")
+                if len(vector) != 768:
+                    raise RuntimeError(f"Invalid embedding dimension: {len(vector)}, expected 768")
                 return list(vector)
 
             except Exception as exc:

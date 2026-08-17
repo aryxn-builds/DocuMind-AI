@@ -71,4 +71,4 @@ def get_chunks_by_ids(chunk_ids: list[str], user_id: str) -> list[dict]:
         .eq("user_id", user_id)
         .execute()
     )
-    return response.data or []
+    return getattr(response, "data", []) or []

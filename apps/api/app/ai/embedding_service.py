@@ -28,7 +28,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Gemini embedding model to use.
-GEMINI_EMBEDDING_MODEL = "gemini-embedding-004"
+# text-embedding-004 is the stable model available on the v1beta API endpoint.
+# gemini-embedding-004 is only available on v1 (not v1beta) and returns 404 via the SDK.
+# Both produce 768-dimensional vectors — Qdrant collection size is unchanged.
+GEMINI_EMBEDDING_MODEL = "text-embedding-004"
 
 # Maximum texts per batch_embed_contents call (Gemini API limit: 250).
 GEMINI_BATCH_LIMIT = 100  # conservative — keeps response size manageable

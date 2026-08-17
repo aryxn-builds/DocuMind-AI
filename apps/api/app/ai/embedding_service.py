@@ -59,7 +59,11 @@ class EmbeddingService:
         self._client = None
 
     def _get_client(self):
-        """Lazily initialise the Gemini client."""
+        """Lazily initialise the Gemini client on the v1 API endpoint.
+
+        The google-genai SDK defaults to v1beta, where embedding models are
+        NOT available (returns 404). Forcing api_version='v1' is required.
+        """
         if self._client is None:
             if not settings.gemini_api_key:
                 raise RuntimeError(
@@ -68,8 +72,11 @@ class EmbeddingService:
                 )
             try:
                 from google import genai
-                self._client = genai.Client(api_key=settings.gemini_api_key)
-                logger.info(f"[EMBEDDING] Gemini client initialised model={self.model_name}")
+                self._client = genai.Client(
+                    api_key=settings.gemini_api_key,
+                    http_options={"api_version": "v1"},
+                )
+                logger.info(f"[EMBEDDING] Gemini client initialised model={self.model_name} api_version=v1")
             except Exception as exc:
                 logger.error(f"[EMBEDDING] Failed to initialise Gemini client: {exc}")
                 raise RuntimeError(f"Failed to initialise Gemini embedding client: {exc}") from exc

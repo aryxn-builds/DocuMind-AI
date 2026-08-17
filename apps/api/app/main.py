@@ -2,30 +2,68 @@
 DocuMind AI — FastAPI Application Entry Point.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai.processing_orchestrator import run_orphan_recovery
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 from app.repositories import job_repository
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Orphan recovery loop
+# ---------------------------------------------------------------------------
+
+async def _orphan_recovery_loop():
+    """
+    Runs indefinitely, calling run_orphan_recovery every RECOVERY_INTERVAL_SECONDS.
+
+    This ensures that any job silently killed by OOM or SIGKILL (which bypasses
+    Python's try/except) gets marked FAILED within a bounded time window, so users
+    always see a terminal state (ready or failed) and never see infinite PROCESSING.
+    """
+    RECOVERY_INTERVAL_SECONDS = 300  # every 5 minutes
+    while True:
+        await asyncio.sleep(RECOVERY_INTERVAL_SECONDS)
+        await run_orphan_recovery()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: fail any jobs that were left running or queued when the process crashed
+    # --- Startup ---
+    # 1. Clean up any jobs that were in-flight when the process last crashed.
     try:
-        count = job_repository.fail_stale_jobs("Process restarted unexpectedly")
+        count = job_repository.fail_stale_jobs("Process restarted — job was orphaned.")
         if count > 0:
-            logger.warning(f"Marked {count} stale jobs as failed during startup.")
+            logger.warning(
+                f"[STARTUP] Marked {count} stale job(s) as failed during startup."
+            )
+        else:
+            logger.info("[STARTUP] No stale jobs found.")
     except Exception as e:
-        logger.error(f"Failed to run stale job sweep: {e}")
+        logger.error(f"[STARTUP] Failed to run stale job sweep: {e}")
+
+    # 2. Start the periodic orphan recovery background loop.
+    recovery_task = asyncio.create_task(_orphan_recovery_loop())
+    logger.info("[STARTUP] Orphan recovery loop started.")
 
     yield
-    # Shutdown
+
+    # --- Shutdown ---
+    recovery_task.cancel()
+    try:
+        await recovery_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("[SHUTDOWN] Orphan recovery loop stopped.")
+
 
 app = FastAPI(
     title=settings.app_name,

@@ -226,7 +226,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                       </div>
                     ) : (
                       <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown>{msg.content.replace(/\[Source:\s*([a-f0-9\-]{36})(?:\s*\|\s*Page:\s*\d+)?\]/gi, '')}</ReactMarkdown>
                       </div>
                     )}
                     {msg.citations && msg.citations.length > 0 && (

@@ -5,9 +5,12 @@ pydantic>=2.10.0
 pydantic-settings>=2.7.0
 PyJWT[crypto]>=2.9.0
 supabase>=2.11.0
-docling>=2.0.0
+# PDF parsing — lightweight C extension, no ML models, ~30-50 MB RSS
+pymupdf>=1.24.0
+# DOCX parsing — pure Python, no ML models
+python-docx>=1.1.0
+# Gemini SDK — used for vision enrichment AND embeddings (replaces sentence-transformers+PyTorch)
 google-genai>=0.1.0
-sentence-transformers>=3.0.0
 numpy>=1.26.0
 qdrant-client>=1.9.0
 Pillow>=10.0.0

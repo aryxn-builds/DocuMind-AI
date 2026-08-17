@@ -1,20 +1,21 @@
 """
 DocuMind AI — Embedding Service (Gemini Embedding API).
 
-Replaces the sentence-transformers / PyTorch local embedding model with the
-Google Gemini Embedding API. This eliminates the ~300-400 MB PyTorch RSS spike
-that caused OOM kills on Render's 512 MB free tier.
+Uses the google-genai SDK with gemini-embedding-2 to generate
+768-dimensional embeddings via HTTPS. Zero local RAM footprint.
 
-Model: gemini-embedding-004
-Vector dimension: 768  (BREAKING CHANGE from 384 — Qdrant collection must be recreated)
-Task type: RETRIEVAL_DOCUMENT for document chunks, RETRIEVAL_QUERY for search queries.
+IMPORTANT — Batching:
+  When passing multiple texts, each text MUST be wrapped in its own
+  types.Content object.  Passing a plain list of strings causes the
+  API to concatenate them into ONE content and return ONE embedding.
 
+Model: gemini-embedding-2
+Vector dimension: 768  (matches Qdrant VECTOR_SIZE)
 Rate limits (free tier): 1500 RPM, 100 RPD per model.
-Batching: up to 250 chunks per batch call via batch_embed_contents.
 
 Requirements:
-  - GEMINI_API_KEY must be set (already required by vision enrichment service)
-  - google-genai >= 0.1.0 (already in requirements.txt)
+  - GEMINI_API_KEY must be set
+  - google-genai >= 0.1.0
 """
 
 from __future__ import annotations
@@ -29,10 +30,10 @@ logger = logging.getLogger(__name__)
 
 # Gemini embedding model to use.
 # gemini-embedding-2 is the official production model.
-# We explicitly specify output_dimensionality=768 to match Qdrant configuration.
+# We explicitly specify output_dimensionality=768 to match Qdrant.
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
 
-# Maximum texts per batch_embed_contents call (Gemini API limit: 250).
+# Maximum texts per embed_content call (Gemini API limit: 250).
 GEMINI_BATCH_LIMIT = 100  # conservative — keeps response size manageable
 
 
@@ -41,7 +42,7 @@ class EmbeddingService:
     Embedding service backed by the Gemini Embedding API.
 
     Zero local RAM footprint — embeddings are generated via HTTPS call.
-    Falls back gracefully with RuntimeError if GEMINI_API_KEY is not set.
+    Raises RuntimeError if GEMINI_API_KEY is not set.
     """
 
     _instance = None
@@ -60,8 +61,8 @@ class EmbeddingService:
     def _get_client(self):
         """Lazily initialise the Gemini client on the v1 API endpoint.
 
-        The google-genai SDK defaults to v1beta, where embedding models are
-        NOT available (returns 404). Forcing api_version='v1' is required.
+        The google-genai SDK defaults to v1beta, where embedding models
+        are NOT available (returns 404). Forcing api_version='v1' is required.
         """
         if self._client is None:
             if not settings.gemini_api_key:
@@ -75,18 +76,43 @@ class EmbeddingService:
                     api_key=settings.gemini_api_key,
                     http_options={"api_version": "v1"},
                 )
-                logger.info(f"[EMBEDDING] Gemini client initialised model={self.model_name} api_version=v1")
+                logger.info(
+                    "[EMBEDDING] Gemini client initialised "
+                    f"model={self.model_name} api_version=v1"
+                )
             except Exception as exc:
-                logger.error(f"[EMBEDDING] Failed to initialise Gemini client: {exc}")
-                raise RuntimeError(f"Failed to initialise Gemini embedding client: {exc}") from exc
+                logger.error(
+                    f"[EMBEDDING] Failed to initialise Gemini client: {exc}"
+                )
+                raise RuntimeError(
+                    f"Failed to initialise Gemini embedding client: {exc}"
+                ) from exc
         return self._client
+
+    @staticmethod
+    def _build_contents(texts: list[str]):
+        """Wrap each text in its own types.Content so the API returns
+        one embedding per text.
+
+        Passing a bare list of strings causes gemini-embedding-2 to
+        concatenate them into a single content and return only 1 embedding.
+        """
+        from google.genai import types as genai_types
+
+        return [
+            genai_types.Content(
+                role="user",
+                parts=[genai_types.Part.from_text(text=t)],
+            )
+            for t in texts
+        ]
 
     def embed(self, chunks: list[Chunk]) -> list[tuple[Chunk, list[float]]]:
         """
         Embeds a list of Chunks using the Gemini Embedding API.
 
         Returns a list of (Chunk, embedding_vector) tuples.
-        Vectors are L2-normalised (Gemini returns normalised vectors for RETRIEVAL_DOCUMENT).
+        Each vector has exactly 768 dimensions.
         """
         if not chunks:
             return []
@@ -102,9 +128,12 @@ class EmbeddingService:
             texts = [chunk.content for chunk in batch]
 
             logger.info(
-                f"[EMBEDDING] batch started "
-                f"batch_start={batch_start} batch_size={len(batch)}"
+                f"[EMBEDDING] model={self.model_name} "
+                f"input_texts={len(texts)} batch_start={batch_start}"
             )
+
+            # Build separate Content objects — one per text.
+            contents = self._build_contents(texts)
 
             retries = 3
             backoff = 2.0
@@ -114,39 +143,55 @@ class EmbeddingService:
                 try:
                     response = client.models.embed_content(
                         model=self.model_name,
-                        contents=texts,
+                        contents=contents,
                         config=genai_types.EmbedContentConfig(
-                            task_type="RETRIEVAL_DOCUMENT",
                             output_dimensionality=768,
                         ),
                     )
+
                     embeddings = response.embeddings
+
+                    # --- Validation (fail-fast, no retry) ---
                     if not embeddings:
-                        raise RuntimeError("Gemini returned no embeddings")
-                    if len(embeddings) != len(batch):
                         raise RuntimeError(
-                            f"Gemini returned {len(embeddings)} embeddings for {len(batch)} texts."
+                            "Gemini returned no embeddings"
+                        )
+
+                    if len(embeddings) != len(texts):
+                        raise RuntimeError(
+                            f"Gemini returned {len(embeddings)} "
+                            f"embeddings for {len(texts)} texts"
                         )
 
                     logger.info(
-                        f"[EMBEDDING] model={self.model_name} requested_dimension=768 batch_size={len(batch)}"
+                        f"[EMBEDDING] returned_embeddings="
+                        f"{len(embeddings)}"
                     )
 
-                    for chunk, emb in zip(batch, embeddings, strict=True):
+                    for idx, (chunk, emb) in enumerate(
+                        zip(batch, embeddings, strict=True)
+                    ):
                         vector = emb.values
-                        if not vector:
+                        if vector is None:
                             raise RuntimeError(
-                                f"Gemini returned empty embedding for chunk {chunk.chunk_id}"
+                                f"Gemini returned empty embedding "
+                                f"at index {idx}"
                             )
                         if len(vector) != 768:
                             raise RuntimeError(
-                                f"Invalid embedding dimension: {len(vector)}, expected 768"
+                                f"Invalid embedding dimension at "
+                                f"index {idx}: {len(vector)}, "
+                                f"expected 768"
                             )
                         result.append((chunk, list(vector)))
 
-                    logger.info("[EMBEDDING] dimension_validation=passed")
                     logger.info(
-                        f"[EMBEDDING] batch_completed vectors={len(batch)}"
+                        f"[EMBEDDING] dimension=768 "
+                        f"validation=passed"
+                    )
+                    logger.info(
+                        f"[EMBEDDING] batch_completed "
+                        f"vectors={len(batch)}"
                     )
                     last_exc = None
                     break
@@ -154,16 +199,21 @@ class EmbeddingService:
                 except Exception as exc:
                     last_exc = exc
                     logger.warning(
-                        f"[EMBEDDING] batch attempt {attempt + 1}/{retries} failed: {exc}"
+                        f"[EMBEDDING] batch attempt "
+                        f"{attempt + 1}/{retries} failed: {exc}"
                     )
                     if attempt < retries - 1:
                         time.sleep(backoff)
                         backoff *= 2
 
             if last_exc is not None:
-                logger.error(f"[EMBEDDING] batch permanently failed: {last_exc}")
+                logger.error(
+                    f"[EMBEDDING] batch permanently failed: "
+                    f"{last_exc}"
+                )
                 raise RuntimeError(
-                    f"Embedding generation failed after {retries} attempts: {last_exc}"
+                    f"Embedding generation failed after "
+                    f"{retries} attempts: {last_exc}"
                 ) from last_exc
 
         return result
@@ -171,11 +221,14 @@ class EmbeddingService:
     def embed_query(self, text: str) -> list[float]:
         """
         Embeds a single query string for semantic search.
-        Uses RETRIEVAL_QUERY task type for optimised retrieval performance.
+        Uses a single Content object for one query embedding.
         """
         from google.genai import types as genai_types
 
         client = self._get_client()
+
+        # Single text → single Content object.
+        contents = self._build_contents([text])
 
         retries = 3
         backoff = 2.0
@@ -185,26 +238,38 @@ class EmbeddingService:
             try:
                 response = client.models.embed_content(
                     model=self.model_name,
-                    contents=[text],
+                    contents=contents,
                     config=genai_types.EmbedContentConfig(
-                        task_type="RETRIEVAL_QUERY",
                         output_dimensionality=768,
                     ),
                 )
+                if not response.embeddings:
+                    raise RuntimeError(
+                        "Gemini returned no query embeddings"
+                    )
                 vector = response.embeddings[0].values
-                if not vector:
-                    raise RuntimeError("Gemini returned empty query embedding.")
+                if vector is None:
+                    raise RuntimeError(
+                        "Gemini returned empty query embedding."
+                    )
                 if len(vector) != 768:
-                    raise RuntimeError(f"Invalid embedding dimension: {len(vector)}, expected 768")
+                    raise RuntimeError(
+                        f"Invalid query embedding dimension: "
+                        f"{len(vector)}, expected 768"
+                    )
                 return list(vector)
 
             except Exception as exc:
                 last_exc = exc
-                logger.warning(f"[EMBEDDING] query attempt {attempt + 1}/{retries} failed: {exc}")
+                logger.warning(
+                    f"[EMBEDDING] query attempt "
+                    f"{attempt + 1}/{retries} failed: {exc}"
+                )
                 if attempt < retries - 1:
                     time.sleep(backoff)
                     backoff *= 2
 
         raise RuntimeError(
-            f"Query embedding failed after {retries} attempts: {last_exc}"
+            f"Query embedding failed after {retries} attempts: "
+            f"{last_exc}"
         ) from last_exc

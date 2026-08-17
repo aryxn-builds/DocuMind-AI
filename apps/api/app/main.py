@@ -54,6 +54,27 @@ async def lifespan(app: FastAPI):
     recovery_task = asyncio.create_task(_orphan_recovery_loop())
     logger.info("[STARTUP] Orphan recovery loop started.")
 
+    # 3. Model availability diagnostics
+    if settings.groq_api_key:
+        try:
+            import groq
+            from app.ai.gateway import gateway
+            client = groq.AsyncGroq(api_key=settings.groq_api_key)
+            models = await client.models.list()
+            available_models = [m.id for m in models.data]
+            logger.info(f"[STARTUP] Groq configured model: {settings.groq_model}")
+            if settings.groq_model not in available_models:
+                logger.warning(
+                    f"[STARTUP] Configured Groq model '{settings.groq_model}' is not available "
+                    f"for this API key. Available models: {available_models}. "
+                    "Disabling Groq to prevent 404 errors; defaulting to Gemini fallback."
+                )
+                gateway.groq_api_key = None
+            else:
+                logger.info(f"[STARTUP] Groq model '{settings.groq_model}' is available.")
+        except Exception as e:
+            logger.error(f"[STARTUP] Failed to verify Groq model availability: {e}")
+
     yield
 
     # --- Shutdown ---

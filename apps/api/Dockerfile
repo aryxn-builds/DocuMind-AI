@@ -2,8 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# libgl1 and libglib2.0-0 are required by PyMuPDF (fitz) for rendering.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -15,8 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 ENV PYTHONPATH=/app
-ENV TORCHDYNAMO_DISABLE=1
+# MALLOC_ARENA_MAX limits glibc's memory pool fragmentation — good practice on all tiers.
 ENV MALLOC_ARENA_MAX=2
+# TORCHDYNAMO_DISABLE is no longer needed — PyTorch has been removed from this stack.
 
 EXPOSE 8000
 

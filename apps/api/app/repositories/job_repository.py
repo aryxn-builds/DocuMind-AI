@@ -126,18 +126,41 @@ def complete_job(job_id: str) -> None:
 
 
 def find_stale_processing_jobs(older_than_minutes: int) -> list[dict]:
-    """Finds jobs stuck in processing state for longer than the specified minutes."""
-    threshold = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+    """
+    Finds jobs stuck in 'processing' or 'queued' state beyond the threshold.
 
-    response = (
+    - processing jobs: uses started_at as the clock reference.
+    - queued jobs:     uses created_at (they may never have been started).
+    """
+    threshold = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+    threshold_str = threshold.isoformat()
+
+    results: list[dict] = []
+
+    # Jobs that started processing but never completed.
+    processing_resp = (
         _client()
         .table(TABLE)
         .select("*")
         .eq("status", "processing")
-        .lt("started_at", threshold.isoformat())
+        .lt("started_at", threshold_str)
         .execute()
     )
-    return response.data or []
+    results.extend(processing_resp.data or [])
+
+    # Jobs that were queued but never claimed (process killed before claim_job ran).
+    queued_resp = (
+        _client()
+        .table(TABLE)
+        .select("*")
+        .eq("status", "queued")
+        .lt("created_at", threshold_str)
+        .execute()
+    )
+    results.extend(queued_resp.data or [])
+
+    return results
+
 
 def fail_stale_jobs(message: str) -> int:
     """Marks all 'processing' or 'queued' jobs as failed during process startup."""
@@ -149,7 +172,7 @@ def fail_stale_jobs(message: str) -> int:
         response = _client().table(TABLE).select("id, document_id, user_id").eq("status", status).execute()
         if not response.data:
             continue
-            
+
         for job in response.data:
             # Update job status
             _client().table(TABLE).update({
@@ -157,12 +180,12 @@ def fail_stale_jobs(message: str) -> int:
                 "completed_at": now,
                 "error_details": {"stage": "startup", "message": message, "retry_count": 0}
             }).eq("id", job["id"]).execute()
-            
+
             # Update document status to failed
             _client().table("documents").update({
                 "status": "failed"
             }).eq("id", job["document_id"]).eq("user_id", job["user_id"]).execute()
-            
+
             count += 1
 
     return count

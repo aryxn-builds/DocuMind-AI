@@ -75,7 +75,7 @@ class Settings(BaseSettings):
         description="Vision provider: gemini | ollama.",
     )
     gemini_vision_model: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-2.5-flash",
         description="Gemini model for vision enrichment.",
     )
     groq_model: str = Field(
@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         description="Groq model ID for chat completions.",
     )
     gemini_chat_model: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-2.5-flash",
         description="Gemini model ID for chat completions (fallback LLM).",
     )
     max_pages: int = Field(default=500, description="Document page limit.")

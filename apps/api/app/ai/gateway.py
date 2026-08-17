@@ -105,8 +105,7 @@ class AIGateway:
             model=self.gemini_model,
             contents=gemini_messages,
             config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.1
+                system_instruction=system_instruction
             )
         )
 

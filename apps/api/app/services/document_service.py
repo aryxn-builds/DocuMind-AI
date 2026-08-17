@@ -207,8 +207,17 @@ def register_document(
             detail="Document was registered but failed to queue for processing.",
         ) from exc
 
-    # Dispatch to background tasks
-    background_tasks.add_task(orchestrator.run, job["id"], str(request.document_id), user_id)
+    # Dispatch to background tasks using the SYNC entry point.
+    # Starlette runs sync tasks via anyio.to_thread.run_sync — a clean thread-pool
+    # dispatch with no asyncio dependencies. This is more reliable than passing an
+    # async coroutine from a sync context, especially on Render free tier where the
+    # process lifecycle can end before a coroutine is fully awaited.
+    background_tasks.add_task(
+        orchestrator.run_as_background_task,
+        job["id"],
+        str(request.document_id),
+        user_id,
+    )
 
     return DocumentRegisterResponse(
         id=request.document_id,

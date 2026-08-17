@@ -58,10 +58,23 @@ class AIGateway:
                 logger.error(f"Groq unexpected error, attempting Gemini fallback: {e}")
 
         if self.gemini_api_key:
-            logger.info("Attempting fallback LLM provider (Gemini)")
-            async for chunk in self._stream_gemini(messages):
-                yield chunk
-            return
+            logger.info(f"Attempting fallback LLM provider (Gemini: {self.gemini_model})")
+            try:
+                async for chunk in self._stream_gemini(messages, model=self.gemini_model):
+                    yield chunk
+                return
+            except Exception as e:
+                logger.error(f"Primary Gemini model ({self.gemini_model}) failed: {e}")
+                
+                gemini_fallback = getattr(settings, 'gemini_fallback_model', None)
+                if gemini_fallback and gemini_fallback != self.gemini_model:
+                    logger.info(f"Attempting secondary LLM provider (Gemini fallback: {gemini_fallback})")
+                    try:
+                        async for chunk in self._stream_gemini(messages, model=gemini_fallback):
+                            yield chunk
+                        return
+                    except Exception as secondary_err:
+                        logger.error(f"Secondary Gemini fallback ({gemini_fallback}) also failed: {secondary_err}")
 
         raise RuntimeError("No LLM providers available or all providers failed.")
 
@@ -84,13 +97,16 @@ class AIGateway:
                     "provider": "groq"
                 }
 
-    async def _stream_gemini(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
+    async def _stream_gemini(self, messages: list[dict[str, Any]], model: str = None) -> AsyncGenerator[dict[str, Any], None]:
+        import asyncio
         from google import genai
         from google.genai import types
+        from google.genai.errors import APIError
 
         if not self.gemini_client:
             self.gemini_client = genai.Client(api_key=self.gemini_api_key)
 
+        use_model = model or self.gemini_model
         gemini_messages = []
         system_instruction = None
         for msg in messages:
@@ -101,21 +117,47 @@ class AIGateway:
             elif msg["role"] == "assistant":
                 gemini_messages.append({"role": "model", "parts": [{"text": msg["content"]}]})
 
-        response = await self.gemini_client.aio.models.generate_content_stream(
-            model=self.gemini_model,
-            contents=gemini_messages,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction
-            )
-        )
+        max_attempts = 3
+        base_delay = 2
 
-        async for chunk in response:
-            if chunk.text:
-                yield {
-                    "content": chunk.text,
-                    "model": self.gemini_model,
-                    "provider": "gemini"
-                }
+        for attempt in range(max_attempts):
+            try:
+                response = await self.gemini_client.aio.models.generate_content_stream(
+                    model=use_model,
+                    contents=gemini_messages,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        automatic_function_calling={"disable": True}
+                    )
+                )
+
+                # Fetch first chunk to catch 503/429 connection errors early before yielding
+                iterator = response.__aiter__()
+                first_chunk = await iterator.__anext__()
+                
+                if first_chunk.text:
+                    yield {
+                        "content": first_chunk.text,
+                        "model": use_model,
+                        "provider": "gemini"
+                    }
+
+                async for chunk in iterator:
+                    if chunk.text:
+                        yield {
+                            "content": chunk.text,
+                            "model": use_model,
+                            "provider": "gemini"
+                        }
+                return  # Successful completion
+
+            except APIError as e:
+                if getattr(e, 'code', 500) in (429, 500, 503) and attempt < max_attempts - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Gemini error {getattr(e, 'code', 500)} ({getattr(e, 'message', str(e))}). Retrying in {delay}s... (Attempt {attempt + 1}/{max_attempts})")
+                    await asyncio.sleep(delay)
+                else:
+                    raise
 
 
 gateway = AIGateway()

@@ -12,13 +12,18 @@ export default async function DocumentWorkspacePage({
 }) {
   const { id } = await params
   
-  // Verify auth
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
   
-  if (!session) {
+  // Use getUser() for secure Server-Side authentication verification
+  const { data: { user }, error } = await supabase.auth.getUser()
+  
+  if (error || !user) {
     redirect('/login')
   }
+
+  // Get the session solely to retrieve the access_token to pass to Client Components
+  const { data: { session } } = await supabase.auth.getSession()
+  const accessToken = session?.access_token || ''
   
   return (
     <div className="flex h-screen w-full flex-col bg-zinc-50 dark:bg-zinc-950 font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
@@ -46,12 +51,12 @@ export default async function DocumentWorkspacePage({
       <div className="flex flex-1 overflow-hidden">
         {/* Document Viewer Side */}
         <div className="hidden lg:flex flex-1 flex-col bg-zinc-50/50 dark:bg-zinc-950/50 border-r border-zinc-200 dark:border-zinc-800 relative">
-          <DocumentViewer documentId={id} accessToken={session.access_token} />
+          <DocumentViewer documentId={id} accessToken={accessToken} />
         </div>
         
         {/* AI Chat Side */}
         <div className="w-full lg:w-[450px] xl:w-[500px] flex flex-col bg-white dark:bg-zinc-950 h-full relative z-10 shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.5)]">
-          <ChatPanel documentId={id} accessToken={session.access_token} />
+          <ChatPanel documentId={id} accessToken={accessToken} />
         </div>
       </div>
     </div>

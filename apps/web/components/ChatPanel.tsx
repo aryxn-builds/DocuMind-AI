@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Sparkles, Send, Bot, User } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
@@ -33,7 +33,14 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   const [answerDepth, setAnswerDepth] = useState<'low' | 'medium' | 'high'>('medium')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  
+
+  // Keep the latest accessToken available inside async callbacks without
+  // causing re-initialization of the conversation when the token refreshes.
+  const accessTokenRef = useRef(accessToken)
+  useEffect(() => {
+    accessTokenRef.current = accessToken
+  }, [accessToken])
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   const handleScroll = () => {
@@ -49,186 +56,264 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
     }
   }, [messages, autoScroll])
 
+  // ---------------------------------------------------------------------------
+  // Conversation initialization.
+  // Runs ONLY when documentId changes (or API_URL changes on env switch).
+  // accessToken is intentionally EXCLUDED from the dependency array.
+  // The latest token is always read from accessTokenRef.current so that a
+  // Supabase session refresh does NOT re-run this effect and wipe history.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    // Instantly clear old chat to prevent cross-document leakage
+    // Immediately clear state to prevent cross-document message leakage.
     setConversationId(null)
     setMessages([])
-    
+
     let isMounted = true
     const abortController = new AbortController()
 
+    const selectBestConversation = async (
+      convos: Array<{ id: string; created_at: string }>
+    ): Promise<{ id: string; messages: Message[] }> => {
+      if (convos.length === 1) {
+        return { id: convos[0].id, messages: [] }
+      }
+
+      // Multiple conversations exist (legacy duplicates). Fetch details of the
+      // top 3 candidates in parallel and select the one that contains the most
+      // recent actual message — not simply the newest conversation row.
+      const candidates = convos.slice(0, 3)
+      const detailResults = await Promise.all(
+        candidates.map(c =>
+          fetch(`${API_URL}/api/v1/conversations/${c.id}`, {
+            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+            signal: abortController.signal,
+          })
+            .then(r => (r.ok ? r.json() : null))
+            .catch(() => null)
+        )
+      )
+
+      let bestId = convos[0].id
+      let bestMessages: Message[] = []
+      let bestTime = 0
+
+      for (const detail of detailResults) {
+        if (!detail) continue
+        const msgs: Message[] = detail.messages || []
+        if (msgs.length > 0) {
+          // Use the last message's id or fall back to array position as proxy.
+          // The backend orders messages by created_at ASC so last = newest.
+          const lastMsg = msgs[msgs.length - 1] as Message & { created_at?: string }
+          const t = lastMsg.created_at ? new Date(lastMsg.created_at).getTime() : msgs.length
+          if (t > bestTime) {
+            bestTime = t
+            bestId = detail.id
+            bestMessages = msgs
+          }
+        } else if (bestTime === 0) {
+          // All candidates are empty — default to newest (convos[0])
+          bestId = convos[0].id
+        }
+      }
+
+      return { id: bestId, messages: bestMessages }
+    }
+
     const initConversation = async () => {
       try {
-        // 1. Check for existing conversation for this document
-        const getRes = await fetch(`${API_URL}/api/v1/conversations?document_id=${documentId}`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          },
-          signal: abortController.signal
-        })
-        
-        if (getRes.ok && isMounted) {
-          const convos = await getRes.json()
-          if (convos && convos.length > 0) {
-            const existingConvoId = convos[0].id
-            setConversationId(existingConvoId)
-            
-            // 2. Fetch full conversation with messages and citations
-            const fullRes = await fetch(`${API_URL}/api/v1/conversations/${existingConvoId}`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`
-              },
-              signal: abortController.signal
-            })
-            if (fullRes.ok && isMounted) {
-              const fullData = await fullRes.json()
-              setMessages(fullData.messages || [])
-            }
-            return
+        // Step 1: List conversations for this document.
+        const listRes = await fetch(
+          `${API_URL}/api/v1/conversations?document_id=${documentId}`,
+          {
+            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+            signal: abortController.signal,
           }
+        )
+
+        if (!listRes.ok || !isMounted) return
+
+        const convos: Array<{ id: string; created_at: string }> = await listRes.json()
+
+        if (!convos || convos.length === 0 || !isMounted) {
+          // No existing conversation — one will be created lazily on first send.
+          return
         }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') {
-          console.error("Failed to init conversation", e)
+
+        // Step 2: Select the conversation with the most recent chat history.
+        const { id: selectedId, messages: preloadedMessages } =
+          await selectBestConversation(convos)
+
+        if (!isMounted) return
+        setConversationId(selectedId)
+
+        // Step 3: If we already have the full messages from the selection pass,
+        // use them directly. Otherwise fetch the chosen conversation in full.
+        if (preloadedMessages.length > 0) {
+          setMessages(preloadedMessages)
+          return
+        }
+
+        const fullRes = await fetch(
+          `${API_URL}/api/v1/conversations/${selectedId}`,
+          {
+            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+            signal: abortController.signal,
+          }
+        )
+        if (fullRes.ok && isMounted) {
+          const fullData = await fullRes.json()
+          setMessages(fullData.messages || [])
+        }
+      } catch (e: unknown) {
+        const err = e as { name?: string }
+        if (err?.name !== 'AbortError') {
+          console.error('Failed to init conversation', e)
         }
       }
     }
-    
+
     initConversation()
 
     return () => {
       isMounted = false
       abortController.abort()
     }
-  }, [API_URL, accessToken, documentId])
+  }, [API_URL, documentId]) // accessToken intentionally excluded — see comment above
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || isStreaming) return
+  // ---------------------------------------------------------------------------
+  // Message submission
+  // ---------------------------------------------------------------------------
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (!input.trim() || isStreaming) return
 
-    let activeConvoId = conversationId
+      let activeConvoId = conversationId
 
-    if (!activeConvoId) {
-      // Create a new conversation on first message
-      try {
-        const res = await fetch(`${API_URL}/api/v1/conversations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-          body: JSON.stringify({
-            title: 'Document Chat',
-            document_id: documentId
+      // Create conversation lazily on first message for new documents.
+      if (!activeConvoId) {
+        try {
+          const res = await fetch(`${API_URL}/api/v1/conversations`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessTokenRef.current}`,
+            },
+            body: JSON.stringify({
+              title: 'Document Chat',
+              document_id: documentId,
+            }),
           })
-        })
-        if (res.ok) {
-          const data = await res.json()
-          activeConvoId = data.id
-          setConversationId(data.id)
-        } else {
-          console.error("Failed to create conversation")
+          if (res.ok) {
+            const data = await res.json()
+            activeConvoId = data.id
+            setConversationId(data.id)
+          } else {
+            console.error('Failed to create conversation')
+            return
+          }
+        } catch (err) {
+          console.error('Failed to create conversation', err)
           return
         }
-      } catch (err) {
-        console.error("Failed to create conversation", err)
-        return
       }
-    }
 
-    const userMessage = input.trim()
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
-    setIsStreaming(true)
+      const userMessage = input.trim()
+      setInput('')
+      setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+      setIsStreaming(true)
 
-    // Add empty assistant message to append to
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+      // Append empty assistant placeholder that streaming fills in.
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
-    try {
-      const response = await fetch(`${API_URL}/api/v1/conversations/${activeConvoId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          query: userMessage,
-          document_id: documentId,
-          answer_depth: answerDepth
-        })
-      })
+      try {
+        const response = await fetch(
+          `${API_URL}/api/v1/conversations/${activeConvoId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessTokenRef.current}`,
+            },
+            body: JSON.stringify({
+              query: userMessage,
+              document_id: documentId,
+              answer_depth: answerDepth,
+            }),
+          }
+        )
 
-      if (!response.ok) throw new Error('Failed to send message')
+        if (!response.ok) throw new Error('Failed to send message')
 
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let done = false
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        let done = false
 
-      if (reader) {
-        while (!done) {
-          const { value, done: readerDone } = await reader.read()
-          done = readerDone
-          if (value) {
-            const chunkText = decoder.decode(value, { stream: true })
-            const lines = chunkText.split('\n')
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6)
-                if (data === '[DONE]') {
-                  done = true
-                  break
-                }
-                try {
-                  const parsed = JSON.parse(data)
-                  if (parsed.type === 'citations') {
-                    setMessages(prev => {
-                      const newMessages = [...prev]
-                      const lastIndex = newMessages.length - 1
-                      const last = newMessages[lastIndex]
-                      if (last.role === 'assistant') {
-                        newMessages[lastIndex] = { ...last, citations: parsed.citations }
-                      }
-                      return newMessages
-                    })
-                  } else if (parsed.type === 'chunk' || parsed.content) {
-                    setMessages(prev => {
-                      const newMessages = [...prev]
-                      const lastIndex = newMessages.length - 1
-                      const last = newMessages[lastIndex]
-                      if (last.role === 'assistant') {
-                        newMessages[lastIndex] = { ...last, content: last.content + (parsed.content || '') }
-                      }
-                      return newMessages
-                    })
-                  } else if (parsed.error) {
-                    // Backend signalled an error — replace the empty placeholder
-                    // with an informative message so the user sees feedback.
-                    setMessages(prev => {
-                      const newMessages = [...prev]
-                      const lastIndex = newMessages.length - 1
-                      const last = newMessages[lastIndex]
-                      if (last.role === 'assistant' && last.content === '') {
-                        newMessages[lastIndex] = { ...last, content: `⚠ ${parsed.error}` }
-                      }
-                      return newMessages
-                    })
+        if (reader) {
+          while (!done) {
+            const { value, done: readerDone } = await reader.read()
+            done = readerDone
+            if (value) {
+              const chunkText = decoder.decode(value, { stream: true })
+              const lines = chunkText.split('\n')
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6)
+                  if (data === '[DONE]') {
                     done = true
+                    break
                   }
-                } catch {
-                  // ignore incomplete JSON frames
+                  try {
+                    const parsed = JSON.parse(data)
+                    if (parsed.type === 'citations') {
+                      setMessages(prev => {
+                        const next = [...prev]
+                        const last = next[next.length - 1]
+                        if (last?.role === 'assistant') {
+                          next[next.length - 1] = { ...last, citations: parsed.citations }
+                        }
+                        return next
+                      })
+                    } else if (parsed.type === 'chunk' || parsed.content) {
+                      setMessages(prev => {
+                        const next = [...prev]
+                        const last = next[next.length - 1]
+                        if (last?.role === 'assistant') {
+                          next[next.length - 1] = {
+                            ...last,
+                            content: last.content + (parsed.content || ''),
+                          }
+                        }
+                        return next
+                      })
+                    } else if (parsed.error) {
+                      setMessages(prev => {
+                        const next = [...prev]
+                        const last = next[next.length - 1]
+                        if (last?.role === 'assistant' && last.content === '') {
+                          next[next.length - 1] = { ...last, content: `⚠ ${parsed.error}` }
+                        }
+                        return next
+                      })
+                      done = true
+                    }
+                  } catch {
+                    // Ignore incomplete JSON frames mid-stream.
+                  }
                 }
               }
             }
           }
         }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setIsStreaming(false)
       }
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setIsStreaming(false)
-    }
-  }
+    },
+    [API_URL, answerDepth, conversationId, documentId, input, isStreaming]
+  )
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans">
@@ -243,12 +328,12 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
             <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Ask questions about this document</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Depth:</span>
-          <select 
+          <select
             value={answerDepth}
-            onChange={(e) => setAnswerDepth(e.target.value as any)}
+            onChange={e => setAnswerDepth(e.target.value as 'low' | 'medium' | 'high')}
             className="text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="low">Low (Concise)</option>
@@ -259,7 +344,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
       </div>
 
       {/* Messages */}
-      <div 
+      <div
         ref={chatContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6"
@@ -282,11 +367,11 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                   <Bot className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
                 </div>
               )}
-              
-              <div 
+
+              <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  msg.role === 'user' 
-                    ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900' 
+                  msg.role === 'user'
+                    ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
                     : 'bg-zinc-50 text-zinc-900 dark:bg-zinc-900/50 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800/80 shadow-sm'
                 }`}
               >
@@ -306,8 +391,8 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-2 border-t border-zinc-200 dark:border-zinc-800 pt-3 flex flex-wrap gap-2">
                         {msg.citations.map((c, idx) => (
-                          <div 
-                            key={idx} 
+                          <div
+                            key={idx}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-200/50 dark:bg-zinc-800 rounded text-[11px] font-medium text-zinc-600 dark:text-zinc-400 cursor-default"
                             title={`Document source (Score: ${c.relevance_score.toFixed(2)})`}
                           >
@@ -336,24 +421,29 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
 
       {/* Input Form */}
       <div className="shrink-0 p-4 bg-white dark:bg-zinc-950">
-        <form onSubmit={handleSubmit} className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100 transition-shadow">
+        <form
+          onSubmit={handleSubmit}
+          className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100 transition-shadow"
+        >
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 handleSubmit(e)
               }
             }}
-            disabled={!conversationId || isStreaming}
-            placeholder={isStreaming ? "AI is typing..." : "Ask a question..."}
+            // Only disabled while a response is streaming.
+            // conversationId=null is valid for new docs (created lazily on submit).
+            disabled={isStreaming}
+            placeholder={isStreaming ? 'AI is typing...' : 'Ask a question...'}
             className="flex-1 min-h-[44px] max-h-[150px] resize-none bg-transparent px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
             rows={1}
           />
           <button
             type="submit"
-            disabled={!conversationId || isStreaming || !input.trim()}
+            disabled={isStreaming || !input.trim()}
             className="shrink-0 flex items-center justify-center w-[44px] h-[44px] rounded-full bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:hover:bg-zinc-900 dark:disabled:hover:bg-zinc-100"
           >
             <Send className="w-4 h-4 translate-x-[-1px] translate-y-[1px]" />

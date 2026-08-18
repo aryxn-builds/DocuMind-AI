@@ -28,6 +28,7 @@ beyond the timeout as FAILED, providing a safety net for process kills.
 
 import logging
 import threading
+import time
 
 from app.ai.adapters.factory import get_adapter
 from app.ai.chunker import Chunker

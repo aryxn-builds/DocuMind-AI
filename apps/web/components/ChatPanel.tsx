@@ -73,6 +73,7 @@ export function ChatPanel({
     const abortController = new AbortController()
 
     const fetchConversation = async () => {
+      const t0 = performance.now()
       try {
         const res = await fetch(`${API_URL}/api/v1/conversations/${activeConversationId}`, {
           headers: { Authorization: `Bearer ${accessTokenRef.current}` },
@@ -80,12 +81,17 @@ export function ChatPanel({
         })
         if (res.ok && isMounted) {
           const data = await res.json()
+          const loadMs = Math.round(performance.now() - t0)
+          console.log(
+            `[PERF_CHAT] conversation_load_ms=${loadMs} conversation_id=${activeConversationId} ` +
+              `message_count=${(data.messages || []).length}`
+          )
           setMessages(data.messages || [])
         }
       } catch (e: unknown) {
         const err = e as { name?: string }
         if (err?.name !== 'AbortError') {
-          console.error('Failed to fetch conversation', e)
+          console.error('[CHAT_HISTORY] fetch_conversation_error', e)
         }
       }
     }
@@ -161,6 +167,8 @@ export function ChatPanel({
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let done = false
+        const t_send = performance.now()
+        let firstChunkLogged = false
 
         if (reader) {
           while (!done) {
@@ -189,6 +197,11 @@ export function ChatPanel({
                         return next
                       })
                     } else if (parsed.type === 'chunk' || parsed.content) {
+                      if (!firstChunkLogged) {
+                        const ttui = Math.round(performance.now() - t_send)
+                        console.log(`[PERF_CHAT] first_chunk_to_ui_ms=${ttui}`)
+                        firstChunkLogged = true
+                      }
                       setMessages(prev => {
                         const next = [...prev]
                         const last = next[next.length - 1]

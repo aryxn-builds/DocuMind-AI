@@ -52,9 +52,8 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | N
         .maybe_single()
         .execute()
     )
-    if not response:
-        return None
-    return getattr(response, "data", []) if hasattr(response, 'data') else response.get('data')
+    # maybe_single() returns response.data as a single dict or None, never a list.
+    return getattr(response, "data", None)
 
 def list_conversations(user_id: str, document_id: str | None = None, limit: int = 50) -> list[dict]:
     """Lists recent conversations for a user."""

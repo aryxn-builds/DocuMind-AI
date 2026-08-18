@@ -2,20 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { MessageSquare, Plus, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+import type { Conversation } from './DocumentWorkspaceClient'
 // Native JS date utils instead of date-fns
-
-type Conversation = {
-  id: string
-  title: string
-  document_id: string | null
-  document_filename: string | null
-  updated_at: string
-}
 
 interface ChatHistorySidebarProps {
   accessToken: string
   activeConversationId: string | null
-  onSelectConversation: (id: string) => void
+  /** Receives the full Conversation object so the parent can use document_id for navigation. */
+  onSelectConversation: (conversation: Conversation) => void
   onNewChat: () => void
   refreshTrigger: number // Bump this to re-fetch
 }
@@ -35,17 +29,23 @@ export function ChatHistorySidebar({
 
   const fetchConversations = useCallback(async () => {
     if (!accessToken) return
-    
+
     try {
       const res = await fetch(`${API_URL}/api/v1/conversations`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       })
       if (res.ok) {
-        const data = await res.json()
+        const data: Conversation[] = await res.json()
+        console.log(
+          `[CHAT_HISTORY] sidebar_loaded conversation_count=${data.length} ` +
+            `user_ids=${[...new Set(data.map(c => c.document_id))].join(',')}`
+        )
         setConversations(data)
+      } else {
+        console.error(`[CHAT_HISTORY] sidebar_fetch_failed status=${res.status}`)
       }
     } catch (e) {
-      console.error('Failed to fetch conversations', e)
+      console.error('[CHAT_HISTORY] sidebar_fetch_error', e)
     } finally {
       setIsLoading(false)
     }
@@ -93,13 +93,13 @@ export function ChatHistorySidebar({
     return (
       <div className="w-16 h-full flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 transition-all">
         <div className="p-4 flex flex-col items-center gap-4 shrink-0">
-          <button 
+          <button
             onClick={() => setIsCollapsed(false)}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
           >
             <ChevronRight className="w-4 h-4 text-zinc-500" />
           </button>
-          <button 
+          <button
             onClick={onNewChat}
             className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
             title="New Chat"
@@ -116,14 +116,14 @@ export function ChatHistorySidebar({
       <div className="p-4 flex items-center justify-between shrink-0 border-b border-zinc-200/50 dark:border-zinc-800/50">
         <h2 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Chat History</h2>
         <div className="flex items-center gap-1">
-          <button 
+          <button
             onClick={onNewChat}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500"
             title="New Chat"
           >
             <Plus className="w-4 h-4" />
           </button>
-          <button 
+          <button
             onClick={() => setIsCollapsed(true)}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500"
           >
@@ -150,10 +150,12 @@ export function ChatHistorySidebar({
               {group.items.map(c => (
                 <button
                   key={c.id}
-                  onClick={() => onSelectConversation(c.id)}
+                  // Pass the FULL conversation object so the parent can read document_id
+                  // and navigate to the correct document workspace if needed.
+                  onClick={() => onSelectConversation(c)}
                   className={`w-full text-left p-2 rounded-lg transition-colors flex items-start gap-3 ${
-                    activeConversationId === c.id 
-                      ? 'bg-zinc-200/60 dark:bg-zinc-800/60' 
+                    activeConversationId === c.id
+                      ? 'bg-zinc-200/60 dark:bg-zinc-800/60'
                       : 'hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40'
                   }`}
                 >

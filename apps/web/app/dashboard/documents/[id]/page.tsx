@@ -3,17 +3,20 @@ import { redirect } from 'next/navigation'
 import { DocumentWorkspaceClient } from '@/components/DocumentWorkspaceClient'
 
 export default async function DocumentWorkspacePage({
-  params
+  params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ conversation?: string }>
 }) {
   const { id } = await params
-  
+  const { conversation: conversationId } = await searchParams
+
   const supabase = await createClient()
-  
+
   // Use getUser() for secure Server-Side authentication verification
   const { data: { user }, error } = await supabase.auth.getUser()
-  
+
   if (error || !user) {
     redirect('/login')
   }
@@ -21,8 +24,12 @@ export default async function DocumentWorkspacePage({
   // Get the session solely to retrieve the access_token to pass to Client Components
   const { data: { session } } = await supabase.auth.getSession()
   const accessToken = session?.access_token || ''
-  
+
   return (
-    <DocumentWorkspaceClient documentId={id} accessToken={accessToken} />
+    <DocumentWorkspaceClient
+      documentId={id}
+      accessToken={accessToken}
+      initialConversationId={conversationId ?? null}
+    />
   )
 }

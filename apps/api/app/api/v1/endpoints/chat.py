@@ -67,8 +67,14 @@ def get_conversation(
     for msg in messages_data:
         msg["citations"] = []
         if msg["role"] == "assistant":
-            citations = citation_repository.get_citations_for_message(uuid.UUID(msg["id"]), user_id)
-            msg["citations"] = citations
+            raw_citations = citation_repository.get_citations_for_message(uuid.UUID(msg["id"]), user_id)
+            # Remap DB column document_chunk_id → chunk_id to match CitationResponse schema.
+            # The DB stores chunk_id as document_chunk_id; without this remap Pydantic would
+            # raise a ResponseValidationError and citations would be silently dropped on refresh.
+            for c in raw_citations:
+                if "document_chunk_id" in c and "chunk_id" not in c:
+                    c["chunk_id"] = c.pop("document_chunk_id")
+            msg["citations"] = raw_citations
 
     convo["messages"] = messages_data
     return convo

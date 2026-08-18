@@ -27,7 +27,10 @@ class RagService:
         Executes the RAG pipeline and yields server-sent events (SSE).
         """
         # 1. Validate conversation ownership
+        t_convo_start = time.perf_counter()
         convo = conversation_repository.get_conversation_by_id(conversation_id, user_id)
+        t_convo_ms = int((time.perf_counter() - t_convo_start) * 1000)
+        logger.info(f"[PERF_CHAT] conversation_load_ms={t_convo_ms} conversation_id={conversation_id} user_id={user_id}")
         if not convo:
             raise ValueError("Conversation not found or unauthorized")
 

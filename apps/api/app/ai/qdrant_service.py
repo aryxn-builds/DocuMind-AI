@@ -197,9 +197,20 @@ class QdrantService:
                 # Already exists — ignore.
                 pass
 
+        try:
+            self.client.create_payload_index(
+                collection_name=self.COLLECTION_NAME,
+                field_name="page_number",
+                field_schema=qmodels.PayloadSchemaType.INTEGER,
+            )
+        except Exception:
+            # Already exists — ignore.
+            pass
+
         logger.info(
             f"[QDRANT] user_id_index=ready "
-            f"document_id_index=ready"
+            f"document_id_index=ready "
+            f"page_number_index=ready"
         )
 
     # ------------------------------------------------------------------

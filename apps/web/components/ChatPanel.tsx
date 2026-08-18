@@ -87,26 +87,6 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
             return
           }
         }
-
-        if (!isMounted) return
-
-        // 3. If none exists, create a new one
-        const res = await fetch(`${API_URL}/api/v1/conversations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-          body: JSON.stringify({
-            title: 'Document Chat',
-            document_id: documentId
-          }),
-          signal: abortController.signal
-        })
-        if (res.ok && isMounted) {
-          const data = await res.json()
-          setConversationId(data.id)
-        }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
           console.error("Failed to init conversation", e)
@@ -124,7 +104,37 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !conversationId || isStreaming) return
+    if (!input.trim() || isStreaming) return
+
+    let activeConvoId = conversationId
+
+    if (!activeConvoId) {
+      // Create a new conversation on first message
+      try {
+        const res = await fetch(`${API_URL}/api/v1/conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            title: 'Document Chat',
+            document_id: documentId
+          })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          activeConvoId = data.id
+          setConversationId(data.id)
+        } else {
+          console.error("Failed to create conversation")
+          return
+        }
+      } catch (err) {
+        console.error("Failed to create conversation", err)
+        return
+      }
+    }
 
     const userMessage = input.trim()
     setInput('')
@@ -135,7 +145,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
     setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/conversations/${conversationId}/messages`, {
+      const response = await fetch(`${API_URL}/api/v1/conversations/${activeConvoId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

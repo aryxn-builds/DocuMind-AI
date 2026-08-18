@@ -168,7 +168,7 @@ flowchart TD
     K --> L
 
     L --> M[Chunk document]
-    M --> N[Generate embeddings<br/>BGE / Sentence Transformers]
+    M --> N[Generate embeddings<br/>Gemini Embeddings]
     N --> O[Store chunks in Qdrant<br/>with user_id + document_id metadata]
     O --> P[Store chunk metadata in PostgreSQL]
     P --> Q[Update document status: ready]

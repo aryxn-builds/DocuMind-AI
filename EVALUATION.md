@@ -41,7 +41,7 @@ The evaluation framework measures three dimensions:
 
 | Variable | Options |
 |----------|---------|
-| Embedding model | bge-small, bge-base, bge-large |
+| Embedding model | Gemini Embeddings (e.g. gemini-embedding-2) |
 | Chunking strategy | Fixed-size (256/512/1024 tokens), semantic |
 | Query preprocessing | Raw query, query expansion, instruction-prefixed |
 | K value | 3, 5, 10, 20 |

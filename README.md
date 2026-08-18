@@ -77,7 +77,7 @@ DocuMind AI/
 | File Storage       | Supabase Storage                     |
 | Vector Database    | Qdrant                               |
 | Document Processing| Docling (not yet implemented)        |
-| Embeddings         | BGE / Sentence Transformers (local)  |
+| Embeddings         | Gemini API (gemini-embedding-2)      |
 | LLM — Text         | Groq (primary), Gemini (fallback)    |
 | LLM — Vision       | Gemini                               |
 | LLM — Local        | Ollama (optional)                    |

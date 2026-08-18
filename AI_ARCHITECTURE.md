@@ -17,7 +17,7 @@ graph TB
         OCR["RapidOCR / Tesseract<br/>Scanned Content"]
         VIS["Vision Model<br/>Chart/Image Understanding"]
         CHK["Chunker"]
-        EMB["Embedding Model<br/>BGE / Sentence Transformers"]
+        EMB["Embedding Model<br/>gemini-embedding-2"]
     end
 
     subgraph Retrieval["Retrieval Pipeline"]
@@ -128,7 +128,7 @@ flowchart TD
     A[Incoming AI request] --> B{Task type?}
     B -->|Text Q&A| C[Route to default text provider<br/>DECIDED: Groq]
     B -->|Vision/multimodal| D[Route to vision provider<br/>DECIDED: Gemini]
-    B -->|Embeddings| E[Route to embedding model<br/>DECIDED: Local]
+    B -->|Embeddings| E[Route to embedding model<br/>DECIDED: Gemini]
     B -->|Long document| F[Route to long-context provider]
 
     C --> G{Provider available?}
@@ -147,20 +147,20 @@ flowchart TD
 
 ### 3.1 Embedding Model
 
-**DECIDED:** BGE-based model family from Sentence Transformers library, run locally behind an embedding abstraction.
+**DECIDED:** Gemini embedding model, run via the Gemini API.
 
 | Consideration | Decision |
 |---------------|----------|
-| Model family | BGE (BAAI General Embedding) |
-| Runtime | Sentence Transformers (Python) |
-| Execution | Local (on backend/worker machine) |
-| Dimension | Model-dependent (typically 384–1024) |
-| Cost | Free (local inference) |
+| Model family | Gemini Embeddings |
+| Runtime | Gemini API (google-genai) |
+| Execution | Cloud API |
+| Dimension | 768 |
+| Cost | Free tier / Usage-based |
 
-Recommended starting point:
-- `BAAI/bge-small-en-v1.5` — 384 dim, fast, good for MVP. If quality is insufficient, evaluate `bge-base`.
+Recommended configuration:
+- `gemini-embedding-2` — 768 dim, fast, excellent for semantic search.
 
-**DECIDED:** Exact model is an implementation decision. Model family is locked.
+**DECIDED:** Exact model is locked to `gemini-embedding-2` per the environment configuration.
 
 ### 3.2 Embedding Process
 
@@ -172,9 +172,8 @@ Recommended starting point:
 
 ### 3.3 Query Embedding
 
-- User queries are embedded using the **same model** as document chunks
-- Query is optionally prefixed with task instruction (BGE models support instruction-prefixed queries)
-- Embedded query is sent to Qdrant for similarity search
+- User queries are embedded using the **same model** (`gemini-embedding-2`) as document chunks
+- Embedded query is sent to Qdrant for similarity search (Distance: COSINE)
 
 ---
 
@@ -466,7 +465,7 @@ flowchart TD
 | New embedding model | Swap model in config; re-embed documents if dimensions change |
 | Fine-tuned models | Deploy via Ollama, configure as a provider |
 | Agentic workflows | AI Gateway already supports chained calls |
-| Multi-language support | Swap to multilingual embedding model (e.g., BGE-M3) |
+| Multi-language support | Swap to multilingual embedding model |
 | Real-time processing | Replace polling with streaming; Gateway already supports `stream()` |
 
 ---

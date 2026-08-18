@@ -98,7 +98,7 @@ DocuMind AI transforms how knowledge workers interact with their documents. User
 | AI Gateway | Custom Python abstraction | DECIDED | Provider routing | AI_ARCHITECTURE.md |
 | LLM | Groq, Gemini, Ollama | DECIDED | Text generation, Q&A | AI_ARCHITECTURE.md |
 | Multimodal AI | Gemini (MVP) | DECIDED | Vision tasks, chart understanding | AI_ARCHITECTURE.md |
-| Embeddings | BGE (bge-base-en-v1.5) | DECIDED | Chunk embeddings | AI_ARCHITECTURE.md |
+| Embeddings | Gemini Embeddings (gemini-embedding-2) | DECIDED | Chunk embeddings | AI_ARCHITECTURE.md |
 | Storage | Supabase Storage | DECIDED | Original uploaded documents | ARCHITECTURE.md |
 | Observability | Langfuse | DECIDED | LLM tracing | ARCHITECTURE.md |
 | Testing | Pytest (Backend) / Jest or Playwright (Frontend) | OPEN / UNCLEAR | Unit/E2E testing | AGENTS.md |
@@ -134,7 +134,7 @@ The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL,
 - **Model routing:** Capability-based routing is DECIDED (e.g., text vs vision).
 - **Multimodal processing:** Vision models convert images/charts to text descriptions during ingestion so they can be embedded normally.
 - **Document understanding:** Docling extracts text/tables. Scanned docs use OCR.
-- **Embeddings:** Local BGE-based model from Sentence Transformers.
+- **Embeddings:** Gemini API (gemini-embedding-2).
 - **Retrieval:** Qdrant similarity search with strict `user_id` filtering.
 - **RAG:** Context is constructed from top-K chunks and conversation history, bounded by token limits.
 - **Citations:** LLM is instructed to generate inline citation markers. Backend extracts them, validates them against retrieved chunks (existence, ownership, content match), and stores them.
@@ -180,7 +180,7 @@ The FastAPI backend enforces JWT authentication and RLS via Supabase PostgreSQL,
 ### DECIDED
 - Application uses Next.js, Tailwind, shadcn/ui, FastAPI, Supabase (PostgreSQL, Auth, Storage), and Qdrant. FastAPI BackgroundTasks is used instead of Celery/Redis for MVP.
 - All LLM calls pass through a custom AI Gateway. Text generation uses Groq primary, Gemini fallback. Vision uses Gemini.
-- BGE embedding model family via Sentence Transformers.
+- Gemini API for embedding models.
 - Supabase JWT validation is enforced on all API routes (except health).
 - API routes are versioned under `/api/v1/...`
 - Chat streaming uses SSE for MVP.

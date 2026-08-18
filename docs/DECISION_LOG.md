@@ -47,7 +47,8 @@ This log records major architectural and technical decisions made during the pre
 ### DEC-009: Embedding Model
 **Date:** 2024-05
 **Decision:** BGE model family via Sentence Transformers (local execution).
-**Rationale:** High quality, free local inference. Start with `BAAI/bge-small-en-v1.5` for speed, with `bge-base` as a fallback if quality requires it.
+**Status:** DEPRECATED (Superseded by `gemini-embedding-2`)
+**Rationale (Historical):** High quality, free local inference. Start with `BAAI/bge-small-en-v1.5` for speed, with `bge-base` as a fallback if quality requires it.
 
 ### DEC-010: Vector Database Architecture
 **Date:** 2024-05

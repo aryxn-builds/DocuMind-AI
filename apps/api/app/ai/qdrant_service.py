@@ -260,10 +260,15 @@ class QdrantService:
                 )
             )
 
-        self.client.upsert(
-            collection_name=self.COLLECTION_NAME,
-            points=points,
-        )
+        # Batch upsert to prevent timeouts on large documents
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            batch = points[i: i + batch_size]
+            self.client.upsert(
+                collection_name=self.COLLECTION_NAME,
+                points=batch,
+            )
+
         logger.info(
             f"[QDRANT] upsert_completed "
             f"points={len(points)} user_id={user_id}"

@@ -9,6 +9,7 @@ type Citation = {
   chunk_id: string
   page_number?: number
   relevance_score: number
+  filename?: string
 }
 
 type Message = {
@@ -29,6 +30,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [answerDepth, setAnswerDepth] = useState<'low' | 'medium' | 'high'>('medium')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   
@@ -141,7 +143,8 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
         },
         body: JSON.stringify({
           query: userMessage,
-          document_id: documentId
+          document_id: documentId,
+          answer_depth: answerDepth
         })
       })
 
@@ -220,13 +223,28 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans">
       {/* Header */}
-      <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+      <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">DocuMind AI</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Ask questions about this document</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">DocuMind AI</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Ask questions about this document</p>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Depth:</span>
+          <select 
+            value={answerDepth}
+            onChange={(e) => setAnswerDepth(e.target.value as any)}
+            className="text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="low">Low (Concise)</option>
+            <option value="medium">Medium (Balanced)</option>
+            <option value="high">High (Detailed)</option>
+          </select>
         </div>
       </div>
 
@@ -272,7 +290,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                       </div>
                     ) : (
                       <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                        <ReactMarkdown>{msg.content.replace(/\[Source:\s*([a-f0-9\-]{36})(?:\s*\|\s*Page:\s*\d+)?\]/gi, '')}</ReactMarkdown>
+                        <ReactMarkdown>{msg.content.replace(/\[Source:\s*(\d+)\]/gi, '[$1]')}</ReactMarkdown>
                       </div>
                     )}
                     {msg.citations && msg.citations.length > 0 && (
@@ -284,7 +302,7 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                             title={`Document source (Score: ${c.relevance_score.toFixed(2)})`}
                           >
                             <span>[{idx + 1}]</span>
-                            <span>{c.page_number ? `Page ${c.page_number}` : 'Document source'}</span>
+                            <span>{c.filename || 'Document'} {c.page_number ? `(Page ${c.page_number})` : ''}</span>
                           </div>
                         ))}
                       </div>

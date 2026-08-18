@@ -7,6 +7,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -75,7 +76,7 @@ class ConversationResponse(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     document_id: uuid.UUID | None = Field(default=None, description="Optional document filter")
-    top_k: int = Field(default=5, ge=1, le=20, description="Number of results to return")
+    top_k: int = Field(default=7, ge=1, le=50, description="Number of results to return")
     similarity_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
 
 class SearchResult(BaseModel):
@@ -97,6 +98,7 @@ class SearchResponse(BaseModel):
 class RagRequest(BaseModel):
     query: str = Field(..., min_length=1, description="User question")
     document_id: uuid.UUID | None = Field(default=None, description="Optional document filter for single-doc chat")
+    answer_depth: Literal["low", "medium", "high"] = Field(default="medium", description="Desired answer depth")
 
 class RagResponse(BaseModel):
     """

@@ -162,6 +162,11 @@ class AIGateway:
 
             except APIError as e:
                 if getattr(e, 'code', 500) in (429, 500, 503) and attempt < max_attempts - 1:
+                    # Fast-fail if this is the primary model so we can route to secondary fallback instantly
+                    if use_model == self.gemini_model:
+                        logger.warning(f"Primary Gemini model ({use_model}) {getattr(e, 'code', 500)} busy. Fast-failing to secondary fallback.")
+                        raise
+                        
                     delay = base_delay * (2 ** attempt)
                     logger.warning(f"Gemini error {getattr(e, 'code', 500)} ({getattr(e, 'message', str(e))}). Retrying in {delay}s... (Attempt {attempt + 1}/{max_attempts})")
                     await asyncio.sleep(delay)

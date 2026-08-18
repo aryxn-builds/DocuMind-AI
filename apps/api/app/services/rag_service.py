@@ -44,7 +44,7 @@ class RagService:
         search_request = SearchRequest(
             query=request.query,
             document_id=request.document_id,
-            top_k=15,
+            top_k=7,
             similarity_threshold=0.3
         )
         search_results = retrieval_service.search(user_id, search_request)

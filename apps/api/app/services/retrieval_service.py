@@ -48,6 +48,14 @@ class RetrievalService:
                 )
             )
 
+        if request.page_number is not None:
+            must_conditions.append(
+                qmodels.FieldCondition(
+                    key="page_number",
+                    match=qmodels.MatchValue(value=request.page_number)
+                )
+            )
+
         search_filter = qmodels.Filter(must=must_conditions)
 
         # 3. Search Qdrant

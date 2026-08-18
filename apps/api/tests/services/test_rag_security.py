@@ -58,7 +58,7 @@ async def _stream_one_chunk(content: str) -> AsyncGenerator[dict, None]:
 # 1. Citation injection — LLM cannot cite an arbitrary chunk_id
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@patch("app.repositories.chunk_repository")
+@patch("app.services.rag_service.chunk_repository")
 @patch("app.services.rag_service.conversation_repository")
 @patch("app.services.rag_service.message_repository")
 @patch("app.services.rag_service.retrieval_service")
@@ -90,10 +90,10 @@ async def test_citation_injection_rejected(
     )
     mock_chunk_repo.get_chunks_by_ids.return_value = [{"id": str(real_chunk_id), "document_id": str(uuid.uuid4())}]
 
-    # LLM response cites the REAL chunk AND an invented chunk
+    # LLM response cites the REAL chunk (1) AND an invented chunk (2)
     llm_response = (
-        f"Real ref [Source: {real_chunk_id}] "
-        f"and fake ref [Source: {fake_chunk_id}]."
+        "Real ref [Source: 1] "
+        "and fake ref [Source: 2]."
     )
 
     async def _mock_stream(_messages):

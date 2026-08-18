@@ -79,7 +79,7 @@ class Settings(BaseSettings):
         description="Gemini model for vision enrichment.",
     )
     groq_model: str = Field(
-        default="llama-3.1-8b-instant",
+        default="qwen/qwen3.6-27b",
         description="Groq model ID for chat completions.",
     )
     gemini_chat_model: str = Field(
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
         description="Gemini model ID for chat completions (fallback LLM).",
     )
     gemini_fallback_model: str = Field(
-        default="gemini-2.5-flash",
+        default="gemini-3.6-flash",
         description="Secondary Gemini model ID if primary is unavailable.",
     )
     max_pages: int = Field(default=500, description="Document page limit.")

@@ -12,7 +12,7 @@ def mock_dependencies():
          patch("app.services.rag_service.retrieval_service") as mock_retrieval, \
          patch("app.services.rag_service.document_repository") as mock_doc_repo, \
          patch("app.services.rag_service.gateway") as mock_gateway, \
-         patch("app.repositories.chunk_repository") as mock_chunk_repo, \
+         patch("app.services.rag_service.chunk_repository") as mock_chunk_repo, \
          patch("app.services.rag_service.citation_repository") as mock_cit_repo:
         
         yield {

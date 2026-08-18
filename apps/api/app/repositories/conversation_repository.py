@@ -25,14 +25,8 @@ def create_conversation(
     title: str = "New Conversation",
     document_id: uuid.UUID | None = None
 ) -> dict:
-    """Creates a new conversation for the user, or returns an existing one for the document."""
+    """Creates a new conversation for the user."""
     
-    # Idempotency check: if a conversation already exists for this document and user, return it
-    if document_id:
-        existing = list_conversations(user_id, document_id=str(document_id), limit=1)
-        if existing:
-            return existing[0]
-
     conversation_id = str(uuid.uuid4())
     record = {
         "id": conversation_id,
@@ -62,17 +56,27 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | N
         return None
     return getattr(response, "data", []) if hasattr(response, 'data') else response.get('data')
 
-def list_conversations(user_id: str, document_id: str | None = None, limit: int = 20) -> list[dict]:
-    """Lists recent conversations for a user, optionally filtered by document_id."""
-    query = _client().table(TABLE).select("*").eq("user_id", user_id)
+def list_conversations(user_id: str, document_id: str | None = None, limit: int = 50) -> list[dict]:
+    """Lists recent conversations for a user."""
+    query = _client().table(TABLE).select("*, documents(original_filename)").eq("user_id", user_id)
     
     if document_id:
         query = query.eq("document_id", document_id)
         
     response = (
         query
-        .order("created_at", desc=True)
+        .order("updated_at", desc=True)
         .limit(limit)
         .execute()
     )
     return getattr(response, "data", []) or []
+
+def update_conversation_timestamp_and_title(conversation_id: uuid.UUID, user_id: str, title: str | None = None) -> None:
+    """Updates the updated_at timestamp, and optionally the title."""
+    from datetime import datetime, timezone
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if title:
+        updates["title"] = title
+        
+    _client().table(TABLE).update(updates).eq("id", str(conversation_id)).eq("user_id", user_id).execute()

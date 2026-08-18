@@ -112,6 +112,13 @@ class RagService:
 
         # Retrieve conversation history
         history = message_repository.list_messages_for_conversation(conversation_id, user_id)
+        
+        # Update conversation timestamp and optionally the title if this is the first message
+        if len(history) == 1:
+            title = request.query[:40] + "..." if len(request.query) > 40 else request.query
+            conversation_repository.update_conversation_timestamp_and_title(conversation_id, user_id, title=title)
+        else:
+            conversation_repository.update_conversation_timestamp_and_title(conversation_id, user_id)
 
         messages = [{"role": "system", "content": system_prompt + "\n" + context_text}]
         # Add recent history (e.g. last 10 messages)

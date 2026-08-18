@@ -46,6 +46,11 @@ def list_conversations(
 
     for c in convos:
         c["messages"] = []
+        doc_data = c.get("documents")
+        if isinstance(doc_data, dict):
+            c["document_filename"] = doc_data.get("original_filename")
+        else:
+            c["document_filename"] = None
     return convos
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)

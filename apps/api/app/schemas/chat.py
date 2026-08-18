@@ -63,6 +63,7 @@ class ConversationResponse(BaseModel):
     user_id: uuid.UUID
     title: str
     document_id: uuid.UUID | None = None
+    document_filename: str | None = None
     messages: list[MessageResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

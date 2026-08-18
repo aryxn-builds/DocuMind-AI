@@ -22,10 +22,18 @@ type Message = {
 interface ChatPanelProps {
   documentId: string
   accessToken: string
+  activeConversationId: string | null
+  onConversationCreated: (id: string) => void
+  onMessageSent: () => void
 }
 
-export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
-  const [conversationId, setConversationId] = useState<string | null>(null)
+export function ChatPanel({ 
+  documentId, 
+  accessToken, 
+  activeConversationId, 
+  onConversationCreated,
+  onMessageSent
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -34,8 +42,6 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
-  // Keep the latest accessToken available inside async callbacks without
-  // causing re-initialization of the conversation when the token refreshes.
   const accessTokenRef = useRef(accessToken)
   useEffect(() => {
     accessTokenRef.current = accessToken
@@ -56,142 +62,50 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
     }
   }, [messages, autoScroll])
 
-  // ---------------------------------------------------------------------------
-  // Conversation initialization.
-  // Runs ONLY when documentId changes (or API_URL changes on env switch).
-  // accessToken is intentionally EXCLUDED from the dependency array.
-  // The latest token is always read from accessTokenRef.current so that a
-  // Supabase session refresh does NOT re-run this effect and wipe history.
-  // ---------------------------------------------------------------------------
+  // Load selected conversation
   useEffect(() => {
-    // Immediately clear state to prevent cross-document message leakage.
-    setConversationId(null)
-    setMessages([])
+    if (!activeConversationId) {
+      setMessages([])
+      return
+    }
 
     let isMounted = true
     const abortController = new AbortController()
 
-    const selectBestConversation = async (
-      convos: Array<{ id: string; created_at: string }>
-    ): Promise<{ id: string; messages: Message[] }> => {
-      if (convos.length === 1) {
-        return { id: convos[0].id, messages: [] }
-      }
-
-      // Multiple conversations exist (legacy duplicates). Fetch details of the
-      // top 3 candidates in parallel and select the one that contains the most
-      // recent actual message — not simply the newest conversation row.
-      const candidates = convos.slice(0, 3)
-      const detailResults = await Promise.all(
-        candidates.map(c =>
-          fetch(`${API_URL}/api/v1/conversations/${c.id}`, {
-            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
-            signal: abortController.signal,
-          })
-            .then(r => (r.ok ? r.json() : null))
-            .catch(() => null)
-        )
-      )
-
-      let bestId = convos[0].id
-      let bestMessages: Message[] = []
-      let bestTime = 0
-
-      for (const detail of detailResults) {
-        if (!detail) continue
-        const msgs: Message[] = detail.messages || []
-        if (msgs.length > 0) {
-          // Use the last message's id or fall back to array position as proxy.
-          // The backend orders messages by created_at ASC so last = newest.
-          const lastMsg = msgs[msgs.length - 1] as Message & { created_at?: string }
-          const t = lastMsg.created_at ? new Date(lastMsg.created_at).getTime() : msgs.length
-          if (t > bestTime) {
-            bestTime = t
-            bestId = detail.id
-            bestMessages = msgs
-          }
-        } else if (bestTime === 0) {
-          // All candidates are empty — default to newest (convos[0])
-          bestId = convos[0].id
-        }
-      }
-
-      return { id: bestId, messages: bestMessages }
-    }
-
-    const initConversation = async () => {
+    const fetchConversation = async () => {
       try {
-        // Step 1: List conversations for this document.
-        const listRes = await fetch(
-          `${API_URL}/api/v1/conversations?document_id=${documentId}`,
-          {
-            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
-            signal: abortController.signal,
-          }
-        )
-
-        if (!listRes.ok || !isMounted) return
-
-        const convos: Array<{ id: string; created_at: string }> = await listRes.json()
-
-        if (!convos || convos.length === 0 || !isMounted) {
-          // No existing conversation — one will be created lazily on first send.
-          return
-        }
-
-        // Step 2: Select the conversation with the most recent chat history.
-        const { id: selectedId, messages: preloadedMessages } =
-          await selectBestConversation(convos)
-
-        if (!isMounted) return
-        setConversationId(selectedId)
-
-        // Step 3: If we already have the full messages from the selection pass,
-        // use them directly. Otherwise fetch the chosen conversation in full.
-        if (preloadedMessages.length > 0) {
-          setMessages(preloadedMessages)
-          return
-        }
-
-        const fullRes = await fetch(
-          `${API_URL}/api/v1/conversations/${selectedId}`,
-          {
-            headers: { Authorization: `Bearer ${accessTokenRef.current}` },
-            signal: abortController.signal,
-          }
-        )
-        if (fullRes.ok && isMounted) {
-          const fullData = await fullRes.json()
-          setMessages(fullData.messages || [])
+        const res = await fetch(`${API_URL}/api/v1/conversations/${activeConversationId}`, {
+          headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+          signal: abortController.signal,
+        })
+        if (res.ok && isMounted) {
+          const data = await res.json()
+          setMessages(data.messages || [])
         }
       } catch (e: unknown) {
         const err = e as { name?: string }
         if (err?.name !== 'AbortError') {
-          console.error('Failed to init conversation', e)
+          console.error('Failed to fetch conversation', e)
         }
       }
     }
 
-    initConversation()
+    fetchConversation()
 
     return () => {
       isMounted = false
       abortController.abort()
     }
-  }, [API_URL, documentId]) // accessToken intentionally excluded — see comment above
+  }, [activeConversationId, API_URL])
 
-  // ---------------------------------------------------------------------------
-  // Message submission
-  // ---------------------------------------------------------------------------
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
       if (!input.trim() || isStreaming) return
 
-      let activeConvoId = conversationId
+      let currentConvoId = activeConversationId
 
-      // Create conversation lazily on first message for new documents.
-      if (!activeConvoId) {
+      if (!currentConvoId) {
         try {
           const res = await fetch(`${API_URL}/api/v1/conversations`, {
             method: 'POST',
@@ -200,14 +114,14 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
               Authorization: `Bearer ${accessTokenRef.current}`,
             },
             body: JSON.stringify({
-              title: 'Document Chat',
+              title: input.trim().substring(0, 40) + (input.length > 40 ? '...' : ''),
               document_id: documentId,
             }),
           })
           if (res.ok) {
             const data = await res.json()
-            activeConvoId = data.id
-            setConversationId(data.id)
+            currentConvoId = data.id
+            onConversationCreated(data.id)
           } else {
             console.error('Failed to create conversation')
             return
@@ -223,12 +137,11 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
       setMessages(prev => [...prev, { role: 'user', content: userMessage }])
       setIsStreaming(true)
 
-      // Append empty assistant placeholder that streaming fills in.
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
       try {
         const response = await fetch(
-          `${API_URL}/api/v1/conversations/${activeConvoId}/messages`,
+          `${API_URL}/api/v1/conversations/${currentConvoId}/messages`,
           {
             method: 'POST',
             headers: {
@@ -299,25 +212,27 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                       done = true
                     }
                   } catch {
-                    // Ignore incomplete JSON frames mid-stream.
+                    // Ignore incomplete JSON frames
                   }
                 }
               }
             }
           }
         }
+        
+        onMessageSent()
+        
       } catch (e) {
         console.error(e)
       } finally {
         setIsStreaming(false)
       }
     },
-    [API_URL, answerDepth, conversationId, documentId, input, isStreaming]
+    [API_URL, answerDepth, activeConversationId, documentId, input, isStreaming, onConversationCreated, onMessageSent]
   )
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans">
-      {/* Header */}
       <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
@@ -343,7 +258,6 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
         </div>
       </div>
 
-      {/* Messages */}
       <div
         ref={chatContainerRef}
         onScroll={handleScroll}
@@ -419,7 +333,6 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
         <div ref={messagesEndRef} className="h-4" />
       </div>
 
-      {/* Input Form */}
       <div className="shrink-0 p-4 bg-white dark:bg-zinc-950">
         <form
           onSubmit={handleSubmit}
@@ -434,8 +347,6 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
                 handleSubmit(e)
               }
             }}
-            // Only disabled while a response is streaming.
-            // conversationId=null is valid for new docs (created lazily on submit).
             disabled={isStreaming}
             placeholder={isStreaming ? 'AI is typing...' : 'Ask a question...'}
             className="flex-1 min-h-[44px] max-h-[150px] resize-none bg-transparent px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"

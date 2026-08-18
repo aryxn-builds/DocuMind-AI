@@ -2,7 +2,8 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChatPanel } from '@/components/ChatPanel'
-import { ArrowLeft, FileText, LayoutTemplate } from 'lucide-react'
+import { DocumentViewer } from '@/components/DocumentViewer'
+import { ArrowLeft, FileText } from 'lucide-react'
 
 export default async function DocumentWorkspacePage({
   params
@@ -43,21 +44,9 @@ export default async function DocumentWorkspacePage({
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Document Viewer Side (Placeholder for MVP) */}
+        {/* Document Viewer Side */}
         <div className="hidden lg:flex flex-1 flex-col bg-zinc-50/50 dark:bg-zinc-950/50 border-r border-zinc-200 dark:border-zinc-800 relative">
-          <div className="absolute inset-0 flex items-center justify-center p-8">
-            <div className="text-center max-w-sm flex flex-col items-center">
-              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center mb-6 shadow-sm">
-                <LayoutTemplate className="w-8 h-8 text-zinc-400" />
-              </div>
-              <h3 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
-                Document Viewer Preview
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                The visual document viewer is coming in a future update. For now, use the Chat Panel on the right to extract intelligence from this document.
-              </p>
-            </div>
-          </div>
+          <DocumentViewer documentId={id} accessToken={session.access_token} />
         </div>
         
         {/* AI Chat Side */}

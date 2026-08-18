@@ -38,8 +38,11 @@ def create_conversation(
     return convo_data
 
 @router.get("/conversations", response_model=list[ConversationResponse])
-def list_conversations(user_id: str = Depends(get_current_user)):
-    convos = conversation_repository.list_conversations(user_id)
+def list_conversations(
+    document_id: str | None = None,
+    user_id: str = Depends(get_current_user)
+):
+    convos = conversation_repository.list_conversations(user_id, document_id=document_id)
 
     for c in convos:
         c["messages"] = []

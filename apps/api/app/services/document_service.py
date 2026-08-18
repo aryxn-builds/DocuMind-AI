@@ -113,6 +113,27 @@ def get_upload_url(user_id: str, request: SignedUrlRequest) -> SignedUrlResponse
         expires_at=expires_at,
     )
 
+def get_download_url(user_id: str, document_id: uuid.UUID) -> str:
+    """
+    Retrieves a short-lived download URL for viewing a document.
+    Ensures that the document belongs to the requesting user.
+    """
+    doc = document_repository.get_document_by_id(document_id, user_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+    
+    try:
+        url = storage_service.generate_signed_download_url(doc["file_path"], expires_in_seconds=3600)
+        return url
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate download URL."
+        ) from exc
+
 def get_document_status(user_id: str, document_id: uuid.UUID) -> DocumentStatusResponse:
     """Retrieves lightweight processing status and progress."""
     doc = document_repository.get_document_by_id(document_id, user_id)

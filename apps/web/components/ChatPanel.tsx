@@ -51,6 +51,34 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
     // Create or fetch conversation
     const initConversation = async () => {
       try {
+        // 1. Check for existing conversation for this document
+        const getRes = await fetch(`${API_URL}/api/v1/conversations?document_id=${documentId}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        })
+        
+        if (getRes.ok) {
+          const convos = await getRes.json()
+          if (convos && convos.length > 0) {
+            const existingConvoId = convos[0].id
+            setConversationId(existingConvoId)
+            
+            // 2. Fetch full conversation with messages and citations
+            const fullRes = await fetch(`${API_URL}/api/v1/conversations/${existingConvoId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            })
+            if (fullRes.ok) {
+              const fullData = await fullRes.json()
+              setMessages(fullData.messages || [])
+            }
+            return
+          }
+        }
+
+        // 3. If none exists, create a new one
         const res = await fetch(`${API_URL}/api/v1/conversations`, {
           method: 'POST',
           headers: {

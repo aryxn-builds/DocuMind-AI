@@ -88,6 +88,40 @@ def generate_signed_upload_url(file_path: str) -> tuple[str, datetime]:
         raise RuntimeError(f"Failed to generate signed upload URL: {exc}") from exc
 
 
+def generate_signed_download_url(file_path: str, expires_in_seconds: int = 3600) -> str:
+    """
+    Creates a signed download URL for the given storage path.
+
+    Returns:
+        signed_url string
+
+    The signed URL is GET-only and expires after expires_in_seconds.
+    
+    Raises:
+        RuntimeError: if Supabase Storage fails to generate the URL.
+    """
+    client = _get_admin_client()
+
+    try:
+        response = client.storage.from_(STORAGE_BUCKET).create_signed_url(file_path, expires_in_seconds)
+
+        signed_url = response.get("signed_url") or response.get("signedURL") or response.get("signedUrl")
+        if not signed_url:
+            raise RuntimeError(
+                f"Supabase Storage returned no signed download URL for path: {file_path}. "
+                f"Response: {response}"
+            )
+
+        return signed_url
+
+    except Exception as exc:
+        logger.error(
+            "storage.signed_download_url_failed",
+            extra={"file_path": file_path, "error": str(exc)},
+        )
+        raise RuntimeError(f"Failed to generate signed download URL: {exc}") from exc
+
+
 def object_exists(file_path: str) -> bool:
     """
     Checks whether a Storage object exists at the given path.

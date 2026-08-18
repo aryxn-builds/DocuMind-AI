@@ -55,13 +55,15 @@ def get_conversation_by_id(conversation_id: uuid.UUID, user_id: str) -> dict | N
         return None
     return getattr(response, "data", []) if hasattr(response, 'data') else response.get('data')
 
-def list_conversations(user_id: str, limit: int = 20) -> list[dict]:
-    """Lists recent conversations for a user."""
+def list_conversations(user_id: str, document_id: str | None = None, limit: int = 20) -> list[dict]:
+    """Lists recent conversations for a user, optionally filtered by document_id."""
+    query = _client().table(TABLE).select("*").eq("user_id", user_id)
+    
+    if document_id:
+        query = query.eq("document_id", document_id)
+        
     response = (
-        _client()
-        .table(TABLE)
-        .select("*")
-        .eq("user_id", user_id)
+        query
         .order("created_at", desc=True)
         .limit(limit)
         .execute()

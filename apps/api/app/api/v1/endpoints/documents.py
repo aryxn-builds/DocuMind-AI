@@ -158,6 +158,21 @@ def get_document(
     """
     return document_service.get_document(user_id=user_id, document_id=document_id)
 
+@router.get(
+    "/{document_id}/download-url",
+    response_model=dict,
+    summary="Get a signed URL for downloading/viewing a document",
+)
+def get_download_url(
+    document_id: uuid.UUID,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Request a GET-only signed URL to view a document directly from Supabase Storage.
+    """
+    url = document_service.get_download_url(user_id=user_id, document_id=document_id)
+    return {"url": url}
+
 
 @router.delete(
     "/{document_id}",

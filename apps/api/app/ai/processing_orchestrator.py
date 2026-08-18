@@ -26,6 +26,7 @@ The orphan recovery loop (`run_orphan_recovery`) runs every 5 minutes from
 beyond the timeout as FAILED, providing a safety net for process kills.
 """
 
+import asyncio
 import logging
 import threading
 import time
@@ -34,6 +35,7 @@ from app.ai.adapters.factory import get_adapter
 from app.ai.chunker import Chunker
 from app.ai.embedding_service import EmbeddingService
 from app.ai.qdrant_service import QdrantService
+from app.ai.summarization_service import SummarizationService
 from app.ai.tracer import observe
 from app.ai.vision_service import VisionEnrichmentService
 from app.core.config import settings
@@ -52,6 +54,7 @@ class ProcessingOrchestrator:
     def __init__(self):
         self.vision_service = VisionEnrichmentService()
         self.chunker = Chunker()
+        self.summarization_service = SummarizationService()
         self.embedding_service = EmbeddingService()
         self.qdrant_service = QdrantService()
 
@@ -259,6 +262,25 @@ class ProcessingOrchestrator:
             logger.info(
                 f"[PROCESSING] chunking_completed document_id={document_id} "
                 f"chunks={len(chunks)} [PERF] chunking_ms={t_chunk_ms}"
+            )
+
+            # ------------------------------------------------------------------
+            # Stage 4.5: Summarize
+            # ------------------------------------------------------------------
+            job_repository.update_job_progress(job_id, 0.50, "summarizing")
+            logger.info(f"[PROCESSING] summarization_started document_id={document_id}")
+            t_sum_start = time.perf_counter()
+            try:
+                summary_chunks = asyncio.run(self.summarization_service.summarize_document(normalized_doc, chunks))
+                if summary_chunks:
+                    chunks.extend(summary_chunks)
+            except Exception as e:
+                logger.warning(f"[PROCESSING] summarization_failed document_id={document_id} error={e} (continuing without summaries)")
+                
+            t_sum_ms = int((time.perf_counter() - t_sum_start) * 1000)
+            logger.info(
+                f"[PROCESSING] summarization_completed document_id={document_id} "
+                f"[PERF] summarization_ms={t_sum_ms}"
             )
 
             # ------------------------------------------------------------------

@@ -58,17 +58,25 @@ def delete_by_document(document_id: str, user_id: str):
 
 def get_chunks_by_ids(chunk_ids: list[str], user_id: str) -> list[dict]:
     """
-    Fetches chunks by their IDs, enforcing user ownership.
+    Fetch raw chunk metadata by IDs, asserting ownership via user_id.
     """
     if not chunk_ids:
         return []
+    
+    try:
+        res = _client().table(TABLE).select("*").in_("id", chunk_ids).eq("user_id", user_id).execute()
+        return res.data
+    except Exception as e:
+        logger.error(f"Failed to fetch chunks: {e}")
+        return []
 
-    response = (
-        _client()
-        .table(TABLE)
-        .select("*")
-        .in_("id", chunk_ids)
-        .eq("user_id", user_id)
-        .execute()
-    )
-    return getattr(response, "data", []) or []
+def get_document_summary(document_id: str, user_id: str) -> dict | None:
+    """
+    Fetches the hierarchical document summary chunk if it exists.
+    """
+    try:
+        res = _client().table(TABLE).select("*").eq("document_id", document_id).eq("user_id", user_id).eq("chunk_type", "document_summary").limit(1).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logger.error(f"Failed to fetch document summary: {e}")
+        return None

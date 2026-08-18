@@ -48,17 +48,24 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
   }, [messages, autoScroll])
 
   useEffect(() => {
-    // Create or fetch conversation
+    // Instantly clear old chat to prevent cross-document leakage
+    setConversationId(null)
+    setMessages([])
+    
+    let isMounted = true
+    const abortController = new AbortController()
+
     const initConversation = async () => {
       try {
         // 1. Check for existing conversation for this document
         const getRes = await fetch(`${API_URL}/api/v1/conversations?document_id=${documentId}`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
-          }
+          },
+          signal: abortController.signal
         })
         
-        if (getRes.ok) {
+        if (getRes.ok && isMounted) {
           const convos = await getRes.json()
           if (convos && convos.length > 0) {
             const existingConvoId = convos[0].id
@@ -68,15 +75,18 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
             const fullRes = await fetch(`${API_URL}/api/v1/conversations/${existingConvoId}`, {
               headers: {
                 'Authorization': `Bearer ${accessToken}`
-              }
+              },
+              signal: abortController.signal
             })
-            if (fullRes.ok) {
+            if (fullRes.ok && isMounted) {
               const fullData = await fullRes.json()
               setMessages(fullData.messages || [])
             }
             return
           }
         }
+
+        if (!isMounted) return
 
         // 3. If none exists, create a new one
         const res = await fetch(`${API_URL}/api/v1/conversations`, {
@@ -88,18 +98,26 @@ export function ChatPanel({ documentId, accessToken }: ChatPanelProps) {
           body: JSON.stringify({
             title: 'Document Chat',
             document_id: documentId
-          })
+          }),
+          signal: abortController.signal
         })
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json()
           setConversationId(data.id)
         }
-      } catch (e) {
-        console.error("Failed to init conversation", e)
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.error("Failed to init conversation", e)
+        }
       }
     }
     
     initConversation()
+
+    return () => {
+      isMounted = false
+      abortController.abort()
+    }
   }, [API_URL, accessToken, documentId])
 
   const handleSubmit = async (e: React.FormEvent) => {

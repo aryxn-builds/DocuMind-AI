@@ -25,7 +25,14 @@ def create_conversation(
     title: str = "New Conversation",
     document_id: uuid.UUID | None = None
 ) -> dict:
-    """Creates a new conversation for the user."""
+    """Creates a new conversation for the user, or returns an existing one for the document."""
+    
+    # Idempotency check: if a conversation already exists for this document and user, return it
+    if document_id:
+        existing = list_conversations(user_id, document_id=str(document_id), limit=1)
+        if existing:
+            return existing[0]
+
     conversation_id = str(uuid.uuid4())
     record = {
         "id": conversation_id,

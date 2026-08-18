@@ -139,6 +139,7 @@ class ProcessingOrchestrator:
         try:
             # Idempotent cleanup: remove any vectors/chunks from a prior failed attempt.
             logger.info(f"[PROCESSING] cleanup_started document_id={document_id}")
+            t_cleanup_start = time.perf_counter()
             try:
                 self.qdrant_service.delete_by_document(document_id, user_id)
                 chunk_repository.delete_by_document(document_id, user_id)
@@ -147,7 +148,9 @@ class ProcessingOrchestrator:
                 logger.warning(
                     f"[PROCESSING] cleanup_partial document_id={document_id} error={e}"
                 )
-            logger.info(f"[PROCESSING] cleanup_completed document_id={document_id}")
+            
+            t_cleanup_ms = int((time.perf_counter() - t_cleanup_start) * 1000)
+            logger.info(f"[PROCESSING] cleanup_completed document_id={document_id} [PERF] cleanup_ms={t_cleanup_ms}")
 
             doc = document_repository.get_document_by_id(document_id, user_id)
             if not doc:
@@ -164,15 +167,18 @@ class ProcessingOrchestrator:
             logger.info(
                 f"[PROCESSING] download_started document_id={document_id} path={file_path}"
             )
+            t_download_start = time.perf_counter()
             file_bytes = storage_service.download_document(file_path)
             if not file_bytes:
                 raise RuntimeError(
                     f"Empty or missing file at path '{file_path}'. "
                     "Storage upload may not have completed."
                 )
+            
+            t_download_ms = int((time.perf_counter() - t_download_start) * 1000)
             logger.info(
                 f"[PROCESSING] download_completed document_id={document_id} "
-                f"size_bytes={len(file_bytes)}"
+                f"size_bytes={len(file_bytes)} [PERF] pdf_download_ms={t_download_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -183,6 +189,7 @@ class ProcessingOrchestrator:
                 f"[PROCESSING] parse_started document_id={document_id} "
                 f"mime_type={mime_type}"
             )
+            t_parse_start = time.perf_counter()
             adapter = get_adapter(document_id, user_id, file_path, mime_type, title)
             normalized_doc = adapter.parse(file_bytes)
             logger.info(
@@ -218,6 +225,7 @@ class ProcessingOrchestrator:
             logger.info(
                 f"[PROCESSING] vision_enrich_started document_id={document_id}"
             )
+            t_vision_start = time.perf_counter()
             try:
                 normalized_doc = self.vision_service.enrich(normalized_doc)
             except Exception as e:
@@ -226,8 +234,11 @@ class ProcessingOrchestrator:
                     f"[PROCESSING] vision_enrich_failed document_id={document_id} "
                     f"error={e} (continuing without enrichment)"
                 )
+                
+            t_vision_ms = int((time.perf_counter() - t_vision_start) * 1000)
             logger.info(
-                f"[PROCESSING] vision_enrich_completed document_id={document_id}"
+                f"[PROCESSING] vision_enrich_completed document_id={document_id} "
+                f"[PERF] vision_enrich_ms={t_vision_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -235,15 +246,18 @@ class ProcessingOrchestrator:
             # ------------------------------------------------------------------
             job_repository.update_job_progress(job_id, 0.45, "chunking")
             logger.info(f"[PROCESSING] chunking_started document_id={document_id}")
+            t_chunk_start = time.perf_counter()
             chunks = self.chunker.chunk(normalized_doc)
             if not chunks:
                 raise ValueError(
                     "No processable content extracted from document. "
                     "The file may be empty, image-only, or corrupted."
                 )
+            
+            t_chunk_ms = int((time.perf_counter() - t_chunk_start) * 1000)
             logger.info(
                 f"[PROCESSING] chunking_completed document_id={document_id} "
-                f"chunks={len(chunks)}"
+                f"chunks={len(chunks)} [PERF] chunking_ms={t_chunk_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -254,10 +268,14 @@ class ProcessingOrchestrator:
                 f"[PROCESSING] embedding_started document_id={document_id} "
                 f"chunks={len(chunks)}"
             )
+            t_embed_start = time.perf_counter()
+            t_embed_start = time.perf_counter()
             chunks_with_vectors = self.embedding_service.embed(chunks)
+            
+            t_embed_ms = int((time.perf_counter() - t_embed_start) * 1000)
             logger.info(
                 f"[PROCESSING] embedding_completed document_id={document_id} "
-                f"vectors={len(chunks_with_vectors)}"
+                f"vectors={len(chunks_with_vectors)} [PERF] embedding_ms={t_embed_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -267,6 +285,7 @@ class ProcessingOrchestrator:
             logger.info(
                 f"[PROCESSING] qdrant_upsert_started document_id={document_id}"
             )
+            t_qdrant_start = time.perf_counter()
             try:
                 self.qdrant_service.upsert(chunks_with_vectors, user_id)
             except Exception as e:
@@ -280,9 +299,11 @@ class ProcessingOrchestrator:
                     "Check QDRANT_URL and QDRANT_API_KEY in Render env vars, "
                     "and verify collection dimension = 768."
                 ) from e
+            
+            t_qdrant_ms = int((time.perf_counter() - t_qdrant_start) * 1000)
             logger.info(
                 f"[PROCESSING] qdrant_upsert_completed document_id={document_id} "
-                f"points={len(chunks_with_vectors)}"
+                f"points={len(chunks_with_vectors)} [PERF] qdrant_upsert_ms={t_qdrant_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -292,6 +313,7 @@ class ProcessingOrchestrator:
             logger.info(
                 f"[PROCESSING] pg_chunks_insert_started document_id={document_id}"
             )
+            t_pg_start = time.perf_counter()
             try:
                 chunk_repository.insert_chunks(chunks)
             except Exception as e:
@@ -316,9 +338,11 @@ class ProcessingOrchestrator:
                 raise RuntimeError(
                     f"PostgreSQL chunk insert failed: {e}"
                 ) from e
+            
+            t_pg_ms = int((time.perf_counter() - t_pg_start) * 1000)
             logger.info(
                 f"[PROCESSING] pg_chunks_insert_completed document_id={document_id} "
-                f"chunks={len(chunks)}"
+                f"chunks={len(chunks)} [PERF] postgres_ms={t_pg_ms}"
             )
 
             # ------------------------------------------------------------------
@@ -326,9 +350,11 @@ class ProcessingOrchestrator:
             # ------------------------------------------------------------------
             job_repository.complete_job(job_id)
             document_repository.update_document_status(document_id, user_id, "ready")
+            
+            t_total_ms = int((time.perf_counter() - t_cleanup_start) * 1000)
             logger.info(
                 f"[PROCESSING] job_completed job_id={job_id} "
-                f"document_id={document_id} status=ready"
+                f"document_id={document_id} status=ready [PERF] total_processing_ms={t_total_ms}"
             )
 
         except Exception as e:

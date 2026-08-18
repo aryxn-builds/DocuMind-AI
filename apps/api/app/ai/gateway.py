@@ -25,6 +25,10 @@ class AIGateway:
     errors are re-raised immediately so the caller gets a clear error instead
     of a misleading Gemini-generated response.
     """
+    
+    # Class-level cache to permanently disable Groq if we hit a 404 model_not_found
+    # to avoid wasting 1+ seconds on every request
+    _groq_permanently_failed = False
 
     def __init__(self):
         self.groq_api_key = settings.groq_api_key
@@ -43,17 +47,22 @@ class AIGateway:
         only on network / server-side failures — not on 4xx client errors.
         Yields dictionaries with {"content": str, "model": str, "provider": str}.
         """
-        if self.groq_api_key:
+        if self.groq_api_key and not self.__class__._groq_permanently_failed:
             try:
                 logger.info("Attempting primary LLM provider (Groq)")
                 async for chunk in self._stream_groq(messages):
                     yield chunk
                 return
             except GroqAPIStatusError as e:
-                if getattr(e, 'status_code', 500) in _GROQ_NO_RETRY_STATUS:
-                    logger.error(f"Groq rejected request ({getattr(e, 'status_code', 500)}): {e}")
+                status_code = getattr(e, 'status_code', 500)
+                if status_code == 404:
+                    logger.error(f"Groq rejected request (404 model not found). Disabling Groq for future requests: {e}")
+                    self.__class__._groq_permanently_failed = True
+                elif status_code in _GROQ_NO_RETRY_STATUS:
+                    logger.error(f"Groq rejected request ({status_code}): {e}")
                     raise
-                logger.error(f"Groq server/network error, attempting Gemini fallback: {e}")
+                else:
+                    logger.error(f"Groq server/network error, attempting Gemini fallback: {e}")
             except Exception as e:
                 logger.error(f"Groq unexpected error, attempting Gemini fallback: {e}")
 

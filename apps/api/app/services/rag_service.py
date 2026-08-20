@@ -198,6 +198,18 @@ class RagService:
             logger.error(f"RAG streaming failed: {e}")
             yield {"type": "chunk", "content": f"\n\n[System Error: Failed to generate response - {str(e)}]"}
             return
+            
+        retrieved_pages = sorted(list(set(c["search_result"].page_number for c in chunk_map.values() if getattr(c["search_result"], "page_number", None))))
+        logger.info(
+            f"[CHAT_DEBUG] query='{request.query}' "
+            f"intent={'broad' if query_analysis.is_broad else 'specific'} "
+            f"page_numbers={query_analysis.page_numbers} "
+            f"document_id={request.document_id} "
+            f"retrieved_chunks={len(search_results.results)} "
+            f"retrieved_pages={retrieved_pages} "
+            f"context_length={len(context_text)} "
+            f"provider={provider}"
+        )
 
         # 6. Parse Citations
         citation_matches = set(re.findall(r"\[Source:\s*(\d+)\]", full_response, re.IGNORECASE))

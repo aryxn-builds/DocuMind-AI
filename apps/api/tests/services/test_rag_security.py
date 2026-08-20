@@ -89,6 +89,7 @@ async def test_citation_injection_rejected(
         [_make_search_result(real_chunk_id, uuid.uuid4())]
     )
     mock_chunk_repo.get_chunks_by_ids.return_value = [{"id": str(real_chunk_id), "document_id": str(uuid.uuid4())}]
+    mock_chunk_repo.get_document_summary.return_value = None
 
     # LLM response cites the REAL chunk (1) AND an invented chunk (2)
     llm_response = (

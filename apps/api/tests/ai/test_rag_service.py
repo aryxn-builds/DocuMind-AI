@@ -137,3 +137,28 @@ async def test_rag_service_citations_1_based_indexing(mock_dependencies):
     assert len(citations_list) == 1
     assert citations_list[0]["chunk_id"] == str(chunk_id)
     assert citations_list[0]["filename"] == "report.pdf"
+
+@pytest.mark.asyncio
+async def test_rag_service_page_not_found(mock_dependencies):
+    user_id = "test_user"
+    conversation_id = uuid.uuid4()
+    request = RagRequest(query="what is on page 999?", answer_depth="medium")
+
+    mock_dependencies["convo_repo"].get_conversation_by_id.return_value = {"id": conversation_id, "document_id": None}
+    mock_dependencies["msg_repo"].create_message.return_value = {"id": uuid.uuid4()}
+    mock_dependencies["msg_repo"].list_messages_for_conversation.return_value = []
+    
+    mock_dependencies["retrieval"].search.return_value = SearchResponse(results=[], query_time_ms=10.0)
+    
+    # Run
+    outputs = []
+    async for chunk in rag_service.stream_chat(user_id, conversation_id, request):
+        outputs.append(chunk)
+
+    # Assert search was called with top_k=15 because of page specific query
+    search_call_args = mock_dependencies["retrieval"].search.call_args[0]
+    search_request = search_call_args[1]
+    assert search_request.top_k == 15
+    assert search_request.page_numbers == [999]
+    
+    assert outputs[0]["content"] == "I couldn't find indexed content for page 999 in this document."

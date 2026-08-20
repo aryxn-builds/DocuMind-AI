@@ -77,7 +77,7 @@ class ConversationResponse(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     document_id: uuid.UUID | None = Field(default=None, description="Optional document filter")
-    page_number: int | None = Field(default=None, description="Optional page number filter")
+    page_numbers: list[int] | None = Field(default=None, description="Optional list of page numbers to filter")
     top_k: int = Field(default=7, ge=1, le=50, description="Number of results to return")
     similarity_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
 

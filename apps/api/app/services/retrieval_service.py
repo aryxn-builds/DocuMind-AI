@@ -48,11 +48,11 @@ class RetrievalService:
                 )
             )
 
-        if request.page_number is not None:
+        if request.page_numbers:
             must_conditions.append(
                 qmodels.FieldCondition(
                     key="page_number",
-                    match=qmodels.MatchValue(value=request.page_number)
+                    match=qmodels.MatchAny(any=request.page_numbers)
                 )
             )
 

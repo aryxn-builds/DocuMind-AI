@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { FileText, Search, Shield, Zap, CheckCircle2, MessageSquare, Database, ArrowRight } from 'lucide-react'
+import { createClient } from '@/utils/supabase/server'
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
       {/* Navbar */}
@@ -18,18 +22,29 @@ export default function HomePage() {
             <a href="#how-it-works" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">How it Works</a>
           </nav>
           <div className="flex items-center gap-4">
-            <Link 
-              href="/login" 
-              className="hidden sm:block text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link 
-              href="/signup" 
-              className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-4 py-2 rounded-full text-sm font-medium transition-colors"
-            >
-              Get Started
-            </Link>
+            {user ? (
+              <Link 
+                href="/dashboard" 
+                className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link 
+                  href="/login" 
+                  className="hidden sm:block text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link 
+                  href="/signup" 
+                  className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -55,18 +70,29 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <Link 
-                href="/signup" 
-                className="w-full sm:w-auto bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-8 py-3.5 rounded-full text-base font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                Get Started <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link 
-                href="/login" 
-                className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-950 dark:text-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 px-8 py-3.5 rounded-full text-base font-medium transition-colors flex items-center justify-center"
-              >
-                Sign In
-              </Link>
+              {user ? (
+                <Link 
+                  href="/dashboard" 
+                  className="w-full sm:w-auto bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-8 py-3.5 rounded-full text-base font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  Go to Dashboard <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : (
+                <>
+                  <Link 
+                    href="/signup" 
+                    className="w-full sm:w-auto bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-8 py-3.5 rounded-full text-base font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <Link 
+                    href="/login" 
+                    className="w-full sm:w-auto bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-950 dark:text-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 px-8 py-3.5 rounded-full text-base font-medium transition-colors flex items-center justify-center"
+                  >
+                    Sign In
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </section>

@@ -86,6 +86,16 @@ export async function forgotPassword(formData: FormData) {
 
 export async function resetPassword(formData: FormData) {
   const password = formData.get('password') as string
+  const confirmPassword = formData.get('confirmPassword') as string
+
+  if (!password || !confirmPassword) {
+    redirect(`/reset-password?error=${encodeURIComponent('Both fields are required.')}`)
+  }
+
+  if (password !== confirmPassword) {
+    redirect(`/reset-password?error=${encodeURIComponent('Passwords do not match.')}`)
+  }
+
   const supabase = await createClient()
 
   const { error } = await supabase.auth.updateUser({
@@ -97,5 +107,8 @@ export async function resetPassword(formData: FormData) {
     redirect(`/reset-password?error=${encodeURIComponent(error.message)}`)
   }
 
-  redirect('/login?message=Password has been successfully reset. Please sign in.')
+  // Very important: Sign out so the user does not stay logged in with a recovery session
+  await supabase.auth.signOut()
+
+  redirect('/login?reset=success')
 }

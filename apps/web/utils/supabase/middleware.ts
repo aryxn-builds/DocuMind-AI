@@ -35,6 +35,8 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const isRecovery = (user as any)?.amr?.some((method: any) => method.method === 'recovery')
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
@@ -50,8 +52,16 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (isRecovery && request.nextUrl.pathname !== '/reset-password') {
+    // Force recovery sessions to reset-password
+    const url = request.nextUrl.clone()
+    url.pathname = '/reset-password'
+    return NextResponse.redirect(url)
+  }
+
   if (
     user && 
+    !isRecovery &&
     (request.nextUrl.pathname.startsWith('/login') ||
      request.nextUrl.pathname.startsWith('/signup') ||
      request.nextUrl.pathname.startsWith('/forgot-password') ||

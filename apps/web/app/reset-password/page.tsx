@@ -12,10 +12,7 @@ export default async function ResetPasswordPage({
   const { error } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  const isRecovery = (user as any)?.amr?.some((method: any) => method.method === 'recovery')
-
-  if (!user || !isRecovery) {
+  if (!user) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
         <main className="flex-1 flex items-center justify-center p-6">

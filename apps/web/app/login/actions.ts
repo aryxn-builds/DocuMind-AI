@@ -71,7 +71,10 @@ export async function signout() {
 export async function forgotPassword(formData: FormData) {
   const email = formData.get('email') as string
   const supabase = await createClient()
-  const origin = (await headers()).get('origin') ?? 'http://localhost:3000'
+  const headerStore = await headers()
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+  const host = headerStore.get('host')
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || (host ? `${protocol}://${host}` : 'http://localhost:3000')
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,

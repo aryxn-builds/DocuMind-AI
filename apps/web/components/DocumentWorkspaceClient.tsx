@@ -116,7 +116,7 @@ export function DocumentWorkspaceClient({
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex items-center justify-center w-8 h-8 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />

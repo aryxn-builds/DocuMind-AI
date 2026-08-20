@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { signout } from '../login/actions'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
@@ -18,12 +19,12 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950 font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-zinc-200 bg-white/80 px-6 dark:border-zinc-800/50 dark:bg-zinc-950/80 backdrop-blur-md">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 rounded-md flex items-center justify-center font-bold text-xl leading-none">
             D
           </div>
           <span className="font-semibold text-lg tracking-tight text-zinc-900 dark:text-zinc-50">DocuMind AI</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-4">
           <div className="hidden sm:block text-sm font-medium text-zinc-600 dark:text-zinc-400">
             {user.email}

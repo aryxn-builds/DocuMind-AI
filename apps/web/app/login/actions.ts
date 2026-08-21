@@ -113,5 +113,5 @@ export async function resetPassword(formData: FormData) {
   // Very important: Sign out so the user does not stay logged in with a recovery session
   await supabase.auth.signOut()
 
-  redirect('/login?reset=success')
+  redirect('/login?message=Password+updated+successfully.+You+can+now+sign+in+with+your+new+password.')
 }

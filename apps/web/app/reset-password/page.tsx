@@ -1,6 +1,4 @@
-import { resetPassword } from '../login/actions'
-import { SubmitButton } from '@/components/SubmitButton'
-import { PasswordInput } from '@/components/PasswordInput'
+import { ResetPasswordForm } from './ResetPasswordForm'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 
@@ -42,7 +40,7 @@ export default async function ResetPasswordPage({
               D
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
-              Update password
+              Create New Password
             </h1>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               Please enter your new password
@@ -50,49 +48,7 @@ export default async function ResetPasswordPage({
           </div>
 
           <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-900/50 p-6 sm:p-8 backdrop-blur-sm shadow-xl shadow-zinc-200/20 dark:shadow-black/40">
-            <form action={resetPassword} className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium text-zinc-900 dark:text-zinc-200"
-                >
-                  New Password
-                </label>
-                <PasswordInput
-                  id="password"
-                  name="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={6}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="confirmPassword"
-                  className="text-sm font-medium text-zinc-900 dark:text-zinc-200"
-                >
-                  Confirm New Password
-                </label>
-                <PasswordInput
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  autoComplete="new-password"
-                  required
-                  minLength={6}
-                />
-              </div>
-
-              {error && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-3 text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
-                  {error}
-                </div>
-              )}
-
-              <SubmitButton loadingText="Updating password...">
-                Update Password
-              </SubmitButton>
-            </form>
+            <ResetPasswordForm initialError={error} />
           </div>
         </div>
       </main>

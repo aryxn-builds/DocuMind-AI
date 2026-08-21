@@ -27,12 +27,13 @@ export function ChatHistorySidebar({
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (signal?: AbortSignal) => {
     if (!accessToken) return
 
     try {
       const res = await fetch(`${API_URL}/api/v1/conversations`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal
       })
       if (res.ok) {
         const data: Conversation[] = await res.json()
@@ -44,15 +45,20 @@ export function ChatHistorySidebar({
       } else {
         console.error(`[CHAT_HISTORY] sidebar_fetch_failed status=${res.status}`)
       }
-    } catch (e) {
-      console.error('[CHAT_HISTORY] sidebar_fetch_error', e)
+    } catch (e: unknown) {
+      const err = e as { name?: string }
+      if (err?.name !== 'AbortError') {
+        console.error('[CHAT_HISTORY] sidebar_fetch_error', e)
+      }
     } finally {
       setIsLoading(false)
     }
   }, [accessToken, API_URL])
 
   useEffect(() => {
-    fetchConversations()
+    const abortController = new AbortController()
+    fetchConversations(abortController.signal)
+    return () => abortController.abort()
   }, [fetchConversations, refreshTrigger])
 
   const groupConversations = () => {

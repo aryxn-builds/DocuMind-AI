@@ -58,3 +58,18 @@ def get_citations_for_message(message_id: uuid.UUID, user_id: str) -> list[dict]
         .execute()
     )
     return getattr(response, "data", []) or []
+
+def get_citations_for_messages(message_ids: list[uuid.UUID], user_id: str) -> list[dict]:
+    """Gets citations for multiple messages, filtered by user_id."""
+    if not message_ids:
+        return []
+        
+    response = (
+        _client()
+        .table(TABLE)
+        .select("*")
+        .in_("message_id", [str(mid) for mid in message_ids])
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return getattr(response, "data", []) or []

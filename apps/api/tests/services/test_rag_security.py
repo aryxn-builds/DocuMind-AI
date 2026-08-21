@@ -103,7 +103,7 @@ async def test_citation_injection_rejected(
     mock_gateway.stream_chat = _mock_stream
 
     request = RagRequest(query="test", document_id=uuid.uuid4())
-    chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request)]
+    chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)})]
 
     # Check chunks and citations
     text_chunks = [c["content"] for c in chunks if c.get("type") == "chunk"]
@@ -150,7 +150,7 @@ async def test_unauthorized_conversation_raises(
     request = RagRequest(query="hack", document_id=uuid.uuid4())
 
     with pytest.raises(ValueError, match="not found or unauthorized"):
-        async for _ in svc.stream_chat(user_id, conversation_id, request):
+        async for _ in svc.stream_chat(user_id, conversation_id, request, None):
             pass
 
     # Ensure no LLM call and no DB write happened
@@ -243,7 +243,7 @@ async def test_empty_retrieval_context_prompt(
     mock_gateway.stream_chat = _capture_stream
 
     request = RagRequest(query="What is the secret?", document_id=None)
-    _ = [c async for c in svc.stream_chat(user_id, conversation_id, request)]
+    _ = [c async for c in svc.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)})]
 
     # The system message (first message) must contain the no-results sentinel
     system_content = captured_messages[0]["content"]
@@ -294,7 +294,7 @@ async def test_streaming_failure_no_assistant_message(
     mock_gateway.stream_chat = _failing_stream
 
     request = RagRequest(query="anything", document_id=None)
-    chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request)]
+    chunks = [c async for c in svc.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)})]
 
     # The error chunk is yielded (system error message)
     assert any("[System Error:" in c.get("content", "") for c in chunks), (

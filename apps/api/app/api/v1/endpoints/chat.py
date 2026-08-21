@@ -64,17 +64,20 @@ def get_conversation(
 
     messages_data = message_repository.list_messages_for_conversation(conversation_id, user_id)
 
+    assistant_msg_ids = [uuid.UUID(msg["id"]) for msg in messages_data if msg["role"] == "assistant"]
+    all_citations = citation_repository.get_citations_for_messages(assistant_msg_ids, user_id)
+    
+    citations_by_msg = {}
+    for c in all_citations:
+        # Remap DB column document_chunk_id → chunk_id to match CitationResponse schema.
+        # The DB stores chunk_id as document_chunk_id; without this remap Pydantic would
+        # raise a ResponseValidationError and citations would be silently dropped on refresh.
+        if "document_chunk_id" in c and "chunk_id" not in c:
+            c["chunk_id"] = c.pop("document_chunk_id")
+        citations_by_msg.setdefault(c["message_id"], []).append(c)
+
     for msg in messages_data:
-        msg["citations"] = []
-        if msg["role"] == "assistant":
-            raw_citations = citation_repository.get_citations_for_message(uuid.UUID(msg["id"]), user_id)
-            # Remap DB column document_chunk_id → chunk_id to match CitationResponse schema.
-            # The DB stores chunk_id as document_chunk_id; without this remap Pydantic would
-            # raise a ResponseValidationError and citations would be silently dropped on refresh.
-            for c in raw_citations:
-                if "document_chunk_id" in c and "chunk_id" not in c:
-                    c["chunk_id"] = c.pop("document_chunk_id")
-            msg["citations"] = raw_citations
+        msg["citations"] = citations_by_msg.get(msg["id"], [])
 
     convo["messages"] = messages_data
     return convo
@@ -101,11 +104,18 @@ async def send_message_stream(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     async def generate_sse():
+        import time
+        t_start = time.perf_counter()
+        first_sse = True
         try:
-            async for data_item in rag_service.stream_chat(user_id, conversation_id, request):
+            async for data_item in rag_service.stream_chat(user_id, conversation_id, request, convo):
+                if first_sse:
+                    logger.info(f"[PERF_CHAT] first_sse_sent_ms={int((time.perf_counter() - t_start) * 1000)}")
+                    first_sse = False
                 data = json.dumps(data_item)
                 yield f"data: {data}\n\n"
 
+            logger.info(f"[PERF_CHAT] stream_completed_ms={int((time.perf_counter() - t_start) * 1000)}")
             # Signal successful completion
             yield "data: [DONE]\n\n"
         except ValueError as e:

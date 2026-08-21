@@ -43,7 +43,7 @@ async def test_rag_service_intent_broad_query(mock_dependencies):
     mock_dependencies["gateway"].stream_chat.return_value = mock_stream_gen()
     
     # Run
-    async for _ in rag_service.stream_chat(user_id, conversation_id, request):
+    async for _ in rag_service.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)}):
         pass
 
     # Assert search was called with top_k=30 because of "summarize" and "entire document"
@@ -69,7 +69,7 @@ async def test_rag_service_intent_specific_query(mock_dependencies):
     mock_dependencies["gateway"].stream_chat.return_value = mock_stream_gen()
     
     # Run
-    async for _ in rag_service.stream_chat(user_id, conversation_id, request):
+    async for _ in rag_service.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)}):
         pass
 
     # Assert search was called with top_k=7 because it's a specific query
@@ -117,7 +117,7 @@ async def test_rag_service_citations_1_based_indexing(mock_dependencies):
     
     # Run
     outputs = []
-    async for chunk in rag_service.stream_chat(user_id, conversation_id, request):
+    async for chunk in rag_service.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)}):
         outputs.append(chunk)
 
     # Assert the LLM context had "[Source: 1]" in it
@@ -152,7 +152,7 @@ async def test_rag_service_page_not_found(mock_dependencies):
     
     # Run
     outputs = []
-    async for chunk in rag_service.stream_chat(user_id, conversation_id, request):
+    async for chunk in rag_service.stream_chat(user_id, conversation_id, request, {"id": str(conversation_id)}):
         outputs.append(chunk)
 
     # Assert search was called with top_k=15 because of page specific query

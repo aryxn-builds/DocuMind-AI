@@ -107,7 +107,8 @@ export function DocumentWorkspaceClient({
   }, [documentId])
 
   const handleMessageSent = useCallback(() => {
-    setSidebarRefreshTrigger(prev => prev + 1)
+    // Rely on local updates in the sidebar or just leave it until next load.
+    // We intentionally do not refetch all conversations here to avoid duplicate requests.
   }, [])
 
   return (

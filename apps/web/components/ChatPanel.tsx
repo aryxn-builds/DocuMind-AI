@@ -171,22 +171,30 @@ export function ChatPanel({
         let firstChunkLogged = false
 
         if (reader) {
+          let buffer = ''
           while (!done) {
             const { value, done: readerDone } = await reader.read()
             done = readerDone
             if (value) {
-              const chunkText = decoder.decode(value, { stream: true })
-              const lines = chunkText.split('\n')
+              buffer += decoder.decode(value, { stream: true })
+              let boundary = buffer.indexOf('\n\n')
+              
+              while (boundary !== -1) {
+                const chunk = buffer.slice(0, boundary)
+                buffer = buffer.slice(boundary + 2)
 
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6)
-                  if (data === '[DONE]') {
-                    done = true
-                    break
-                  }
-                  try {
-                    const parsed = JSON.parse(data)
+                const lines = chunk.split('\n')
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6)
+                    if (data === '[DONE]') {
+                      const ttui = Math.round(performance.now() - t_send)
+                      console.log(`[PERF_CHAT] stream_completed_ms=${ttui}`)
+                      done = true
+                      break
+                    }
+                    try {
+                      const parsed = JSON.parse(data)
                     if (parsed.type === 'citations') {
                       setMessages(prev => {
                         const next = [...prev]
@@ -229,13 +237,15 @@ export function ChatPanel({
                   }
                 }
               }
-            }
-          }
-        }
-        
-        onMessageSent()
-        
-      } catch (e) {
+              boundary = buffer.indexOf('\n\n')
+            } // end while(boundary)
+          } // end if(value)
+        } // end while(!done)
+      } // end if(reader)
+
+      onMessageSent()
+      
+    } catch (e) {
         console.error(e)
       } finally {
         setIsStreaming(false)

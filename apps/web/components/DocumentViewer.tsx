@@ -16,12 +16,15 @@ export function DocumentViewer({ documentId, accessToken }: DocumentViewerProps)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
+    const abortController = new AbortController()
+    
     const fetchUrl = async () => {
       try {
         const res = await fetch(`${API_URL}/api/v1/documents/${documentId}/download-url`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
-          }
+          },
+          signal: abortController.signal
         })
         if (!res.ok) {
           throw new Error('Failed to fetch document preview URL')
@@ -29,13 +32,16 @@ export function DocumentViewer({ documentId, accessToken }: DocumentViewerProps)
         const data = await res.json()
         setUrl(data.url)
       } catch (err: any) {
-        setError(err.message)
+        if (err.name !== 'AbortError') {
+          setError(err.message)
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchUrl()
+    return () => abortController.abort()
   }, [documentId, accessToken, API_URL])
 
   if (isLoading) {

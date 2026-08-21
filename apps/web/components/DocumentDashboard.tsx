@@ -25,7 +25,7 @@ export function DocumentDashboard() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const supabase = createClient()
 
-  const fetchDocuments = useCallback(async (isPolling = false) => {
+  const fetchDocuments = useCallback(async (isPolling = false, signal?: AbortSignal) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -33,13 +33,17 @@ export function DocumentDashboard() {
       const res = await fetch(`${API_URL}/api/v1/documents/`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
-        }
+        },
+        signal
       })
       if (!res.ok) throw new Error('Failed to fetch documents')
       const data = await res.json()
       setDocuments(data.documents)
       setError(null)
     } catch (err: unknown) {
+      const e = err as { name?: string }
+      if (e?.name === 'AbortError') return
+      
       if (!isPolling) {
         setError(err instanceof Error ? err.message : String(err))
       } else {
@@ -51,8 +55,10 @@ export function DocumentDashboard() {
   }, [API_URL, supabase.auth])
 
   useEffect(() => {
+    const abortController = new AbortController()
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDocuments()
+    fetchDocuments(false, abortController.signal)
+    return () => abortController.abort()
   }, [fetchDocuments])
 
   // Auto-poll while any document is still processing

@@ -248,7 +248,7 @@ def test_citations_restored_after_refresh(mock_convo, mock_msg, mock_citation):
         "relevance_score": 0.92,
         "created_at": "2026-08-18T17:00:10+00:00",
     }
-    mock_citation.get_citations_for_message.return_value = [citation]
+    mock_citation.get_citations_for_messages.return_value = [citation]
 
     res = client.get(f"/api/v1/conversations/{convo_id}", headers={"Authorization": "Bearer fake"})
     assert res.status_code == 200

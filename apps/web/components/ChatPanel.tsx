@@ -27,12 +27,85 @@ interface ChatPanelProps {
   onMessageSent: () => void
 }
 
-export function ChatPanel({ 
-  documentId, 
-  accessToken, 
-  activeConversationId, 
+// ---------------------------------------------------------------------------
+// SSE Parser — handles arbitrary TCP chunk boundaries.
+//
+// Maintains a mutable buffer and extracts complete SSE frames delimited by
+// "\n\n" (or "\r\n\r\n"). Only complete frames are returned; leftover bytes
+// stay in the buffer for the next call.
+//
+// Returns an array of parsed { type, content, citations, error } objects.
+// Returns null entries for unrecognised / keepalive frames (caller ignores them).
+// ---------------------------------------------------------------------------
+type SseEvent =
+  | { kind: 'chunk'; content: string }
+  | { kind: 'citations'; citations: Citation[] }
+  | { kind: 'done' }
+  | { kind: 'error'; message: string }
+
+function extractSseEvents(buf: string): { events: SseEvent[]; remaining: string } {
+  const events: SseEvent[] = []
+
+  // Normalise line endings so both \r\n and \n work.
+  let buffer = buf.replace(/\r\n/g, '\n')
+
+  // Frames are delimited by a blank line (\n\n).
+  let boundary = buffer.indexOf('\n\n')
+  while (boundary !== -1) {
+    const frame = buffer.slice(0, boundary)
+    buffer = buffer.slice(boundary + 2)
+
+    // A frame may contain multiple lines; pick out "data: …" lines.
+    for (const line of frame.split('\n')) {
+      if (!line.startsWith('data: ')) continue
+
+      const raw = line.slice(6).trim()
+
+      // Sentinel
+      if (raw === '[DONE]') {
+        events.push({ kind: 'done' })
+        break
+      }
+
+      // Keepalive / comment
+      if (raw === '' || raw.startsWith(':')) continue
+
+      try {
+        const parsed = JSON.parse(raw)
+
+        if (parsed.type === 'citations' && Array.isArray(parsed.citations)) {
+          events.push({ kind: 'citations', citations: parsed.citations as Citation[] })
+        } else if (parsed.error) {
+          events.push({ kind: 'error', message: String(parsed.error) })
+        } else if (parsed.type === 'chunk' || parsed.content !== undefined) {
+          // Backend emits { type: "chunk", content: "..." }
+          const content = String(parsed.content ?? '')
+          if (content) events.push({ kind: 'chunk', content })
+        }
+        // Unknown type shapes are silently ignored — they don't kill the stream.
+      } catch {
+        // JSON.parse failure on an individual frame is non-fatal.
+        // The frame may be incomplete (shouldn't happen because we only process
+        // frames past a \n\n boundary, but be defensive).
+        console.warn('[SSE_PARSER] Failed to parse frame:', raw.slice(0, 120))
+      }
+    }
+
+    boundary = buffer.indexOf('\n\n')
+  }
+
+  return { events, remaining: buffer }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+export function ChatPanel({
+  documentId,
+  accessToken,
+  activeConversationId,
   onConversationCreated,
-  onMessageSent
+  onMessageSent,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -42,6 +115,12 @@ export function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
+  // Keep a ref to the latest token so the conversation-load effect can check
+  // whether a stream is currently active before overwriting React state.
+  const isStreamingRef = useRef(false)
+
+  // Keep a stable ref to the access token so async callbacks always have the
+  // latest value without needing to be in the dependency array.
   const accessTokenRef = useRef(accessToken)
   useEffect(() => {
     accessTokenRef.current = accessToken
@@ -49,6 +128,9 @@ export function ChatPanel({
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+  // ---------------------------------------------------------------------------
+  // Auto-scroll
+  // ---------------------------------------------------------------------------
   const handleScroll = () => {
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
@@ -62,7 +144,12 @@ export function ChatPanel({
     }
   }, [messages, autoScroll])
 
-  // Load selected conversation
+  // ---------------------------------------------------------------------------
+  // Load conversation history
+  //
+  // Guard: if a stream is currently active for this conversation, skip the
+  // setMessages call.  The stream owns the state until it completes.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!activeConversationId) {
       setMessages([])
@@ -79,7 +166,18 @@ export function ChatPanel({
           headers: { Authorization: `Bearer ${accessTokenRef.current}` },
           signal: abortController.signal,
         })
+
         if (res.ok && isMounted) {
+          // Bug 3 fix: do NOT overwrite state if a stream is in progress.
+          // The streaming handler owns the message list while isStreamingRef is true.
+          if (isStreamingRef.current) {
+            console.log(
+              '[CHAT_HISTORY] skipping setMessages — stream is active for conversation_id=' +
+                activeConversationId
+            )
+            return
+          }
+
           const data = await res.json()
           const loadMs = Math.round(performance.now() - t0)
           console.log(
@@ -104,13 +202,48 @@ export function ChatPanel({
     }
   }, [activeConversationId, API_URL])
 
+  // ---------------------------------------------------------------------------
+  // Fallback: fetch persisted messages after stream ends with no content.
+  // This is a safety net only — the normal path is streaming content directly.
+  // ---------------------------------------------------------------------------
+  const fetchConversationFallback = useCallback(
+    async (conversationId: string) => {
+      console.log(
+        '[CHAT_FALLBACK] stream produced no content — fetching persisted messages ' +
+          `conversation_id=${conversationId}`
+      )
+      try {
+        const res = await fetch(`${API_URL}/api/v1/conversations/${conversationId}`, {
+          headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const msgs: Message[] = data.messages || []
+          if (msgs.length > 0) {
+            setMessages(msgs)
+            console.log(
+              `[CHAT_FALLBACK] recovered ${msgs.length} messages from DB for conversation_id=${conversationId}`
+            )
+          }
+        }
+      } catch (err) {
+        console.error('[CHAT_FALLBACK] failed to fetch fallback messages', err)
+      }
+    },
+    [API_URL]
+  )
+
+  // ---------------------------------------------------------------------------
+  // Send message + stream response
+  // ---------------------------------------------------------------------------
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
-      if (!input.trim() || isStreaming) return
+      if (!input.trim() || isStreamingRef.current) return
 
       let currentConvoId = activeConversationId
 
+      // ----- Create conversation if first message in a new chat -----
       if (!currentConvoId) {
         try {
           const res = await fetch(`${API_URL}/api/v1/conversations`, {
@@ -127,23 +260,38 @@ export function ChatPanel({
           if (res.ok) {
             const data = await res.json()
             currentConvoId = data.id
+            // NOTE: onConversationCreated triggers setActiveConversationId in the parent,
+            // which triggers the conversation-load useEffect.  We set isStreamingRef
+            // BEFORE calling it so the guard fires in time.
+            isStreamingRef.current = true
+            setIsStreaming(true)
             onConversationCreated(data.id)
           } else {
-            console.error('Failed to create conversation')
+            console.error('[CHAT] failed to create conversation', res.status)
             return
           }
         } catch (err) {
-          console.error('Failed to create conversation', err)
+          console.error('[CHAT] failed to create conversation', err)
           return
         }
+      } else {
+        isStreamingRef.current = true
+        setIsStreaming(true)
       }
 
       const userMessage = input.trim()
       setInput('')
-      setMessages(prev => [...prev, { role: 'user', content: userMessage }])
-      setIsStreaming(true)
 
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+      // Optimistic UI: add user message + empty assistant placeholder
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '' },
+      ])
+
+      const t_send = performance.now()
+      let firstChunkLogged = false
+      let assistantContent = ''
 
       try {
         const response = await fetch(
@@ -162,98 +310,144 @@ export function ChatPanel({
           }
         )
 
-        if (!response.ok) throw new Error('Failed to send message')
+        if (!response.ok) {
+          const errText = await response.text().catch(() => response.statusText)
+          throw new Error(`Backend returned ${response.status}: ${errText}`)
+        }
 
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
-        let done = false
-        const t_send = performance.now()
-        let firstChunkLogged = false
 
-        if (reader) {
-          let buffer = ''
-          while (!done) {
-            const { value, done: readerDone } = await reader.read()
-            done = readerDone
-            if (value) {
-              buffer += decoder.decode(value, { stream: true })
-              let boundary = buffer.indexOf('\n\n')
-              
-              while (boundary !== -1) {
-                const chunk = buffer.slice(0, boundary)
-                buffer = buffer.slice(boundary + 2)
+        if (!reader) {
+          throw new Error('Response body is not readable')
+        }
 
-                const lines = chunk.split('\n')
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    const data = line.slice(6)
-                    if (data === '[DONE]') {
-                      const ttui = Math.round(performance.now() - t_send)
-                      console.log(`[PERF_CHAT] stream_completed_ms=${ttui}`)
-                      done = true
-                      break
-                    }
-                    try {
-                      const parsed = JSON.parse(data)
-                    if (parsed.type === 'citations') {
-                      setMessages(prev => {
-                        const next = [...prev]
-                        const last = next[next.length - 1]
-                        if (last?.role === 'assistant') {
-                          next[next.length - 1] = { ...last, citations: parsed.citations }
-                        }
-                        return next
-                      })
-                    } else if (parsed.type === 'chunk' || parsed.content) {
-                      if (!firstChunkLogged) {
-                        const ttui = Math.round(performance.now() - t_send)
-                        console.log(`[PERF_CHAT] first_chunk_to_ui_ms=${ttui}`)
-                        firstChunkLogged = true
-                      }
-                      setMessages(prev => {
-                        const next = [...prev]
-                        const last = next[next.length - 1]
-                        if (last?.role === 'assistant') {
-                          next[next.length - 1] = {
-                            ...last,
-                            content: last.content + (parsed.content || ''),
-                          }
-                        }
-                        return next
-                      })
-                    } else if (parsed.error) {
-                      setMessages(prev => {
-                        const next = [...prev]
-                        const last = next[next.length - 1]
-                        if (last?.role === 'assistant' && last.content === '') {
-                          next[next.length - 1] = { ...last, content: `⚠ ${parsed.error}` }
-                        }
-                        return next
-                      })
-                      done = true
-                    }
-                  } catch {
-                    // Ignore incomplete JSON frames
-                  }
-                }
+        // ----- PROPER SSE PARSING (Bug 1 + Bug 2 fix) -----
+        //
+        // We maintain a persistent buffer across all reader.read() calls.
+        // extractSseEvents() splits on \n\n and returns only complete frames.
+        // The remainder (incomplete frame) stays in the buffer for the next chunk.
+        // After the reader is done, we do one final flush of whatever remains.
+
+        let buffer = ''
+        let readerDone = false
+
+        while (!readerDone) {
+          const { value, done } = await reader.read()
+          readerDone = done
+
+          // Bug 2 fix: decode even on the final chunk (done=true, value may have data)
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done })
+          }
+
+          // Final flush: when the reader is done, decode any remaining bytes
+          // the TextDecoder held internally (e.g. multi-byte UTF-8 boundary).
+          if (done) {
+            const tail = decoder.decode() // flush internal buffer
+            if (tail) buffer += tail
+          }
+
+          // Process all complete SSE frames in the buffer right now.
+          // extractSseEvents returns the leftover (incomplete frame) as `remaining`.
+          const { events, remaining } = extractSseEvents(buffer)
+          buffer = remaining
+
+          for (const event of events) {
+            if (event.kind === 'chunk') {
+              if (!firstChunkLogged) {
+                const ttui = Math.round(performance.now() - t_send)
+                console.log(`[PERF_CHAT] first_chunk_to_ui_ms=${ttui}`)
+                firstChunkLogged = true
               }
-              boundary = buffer.indexOf('\n\n')
-            } // end while(boundary)
-          } // end if(value)
-        } // end while(!done)
-      } // end if(reader)
+              const token = event.content
+              assistantContent += token
+              setMessages(prev => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                if (last?.role === 'assistant') {
+                  next[next.length - 1] = { ...last, content: last.content + token }
+                }
+                return next
+              })
+            } else if (event.kind === 'citations') {
+              setMessages(prev => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                if (last?.role === 'assistant') {
+                  next[next.length - 1] = { ...last, citations: event.citations }
+                }
+                return next
+              })
+            } else if (event.kind === 'error') {
+              console.error('[SSE] backend error event:', event.message)
+              setMessages(prev => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                if (last?.role === 'assistant' && last.content === '') {
+                  next[next.length - 1] = { ...last, content: `⚠ ${event.message}` }
+                }
+                return next
+              })
+              // Treat error as terminal — stop reading.
+              readerDone = true
+              break
+            } else if (event.kind === 'done') {
+              const ttotal = Math.round(performance.now() - t_send)
+              console.log(`[PERF_CHAT] stream_completed_ms=${ttotal}`)
+              // Mark done — let the outer loop finish normally (don't break;
+              // the reader may already be exhausted or have one last read returning done=true).
+            }
+          }
+        }
 
-      onMessageSent()
-      
-    } catch (e) {
-        console.error(e)
+        // ----- Bug 4 fix: fallback fetch if stream produced no content -----
+        if (assistantContent === '' && currentConvoId) {
+          await fetchConversationFallback(currentConvoId)
+        }
+
+        onMessageSent()
+      } catch (e) {
+        console.error('[CHAT] stream error', e)
+
+        // Show error in the assistant bubble rather than leaving it empty.
+        setMessages(prev => {
+          const next = [...prev]
+          const last = next[next.length - 1]
+          if (last?.role === 'assistant' && last.content === '') {
+            next[next.length - 1] = {
+              ...last,
+              content: '⚠ Something went wrong. Please try again.',
+            }
+          }
+          return next
+        })
+
+        // Attempt to recover persisted content even after a client-side error.
+        if (assistantContent === '' && currentConvoId) {
+          await fetchConversationFallback(currentConvoId).catch(() => {})
+        }
       } finally {
+        // Always clear streaming state — no matter what path exits.
+        isStreamingRef.current = false
         setIsStreaming(false)
       }
     },
-    [API_URL, answerDepth, activeConversationId, documentId, input, isStreaming, onConversationCreated, onMessageSent]
+    [
+      API_URL,
+      answerDepth,
+      activeConversationId,
+      documentId,
+      input,
+      onConversationCreated,
+      onMessageSent,
+      fetchConversationFallback,
+    ]
   )
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans">
       <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3">

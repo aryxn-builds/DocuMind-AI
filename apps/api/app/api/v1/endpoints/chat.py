@@ -123,6 +123,9 @@ async def send_message_stream(
             logger.warning(f"RAG rejected request: {e}")
             error_data = json.dumps({"error": str(e)})
             yield f"data: {error_data}\n\n"
+        except GeneratorExit:
+            # Client disconnected cleanly — nothing to yield, just log and exit.
+            logger.info(f"[PERF_CHAT] client_disconnected_ms={int((time.perf_counter() - t_start) * 1000)}")
         except Exception as e:
             logger.error(f"Error streaming response: {e}")
             error_data = json.dumps({"error": "Generation failed. Please try again."})
@@ -133,6 +136,7 @@ async def send_message_stream(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
     )

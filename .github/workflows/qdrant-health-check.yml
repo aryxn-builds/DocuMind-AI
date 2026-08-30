@@ -1,0 +1,83 @@
+# ==============================================================
+# DocuMind AI — Qdrant Cloud Keep-Alive / Health Check
+# ==============================================================
+#
+# Purpose
+# -------
+# Sends a single lightweight, authenticated, read-only request to
+# the Qdrant Cloud cluster once per day so the cluster remains
+# active during development / testing.
+#
+# What this workflow does NOT do
+# --------------------------------
+# - Does NOT build the Next.js frontend
+# - Does NOT install frontend dependencies
+# - Does NOT start FastAPI or Docker
+# - Does NOT run pytest or any test suite
+# - Does NOT perform LLM / embedding requests
+# - Does NOT upsert, delete, or modify any Qdrant data
+# - Does NOT depend on Render, Vercel, or any other deployment
+#
+# Required GitHub Repository Secrets (Settings → Secrets → Actions)
+# -------------------------------------------------------------------
+#   QDRANT_URL      – Full Qdrant cluster URL
+#                     e.g. https://xyz.qdrant.io:6333
+#   QDRANT_API_KEY  – Qdrant REST API key
+#
+# Credentials are injected at runtime and are never printed or
+# stored in logs, source code, or artifact files.
+# ==============================================================
+
+name: Qdrant Cloud Keep-Alive
+
+on:
+  # Run automatically once per day at 02:00 UTC.
+  # Adjust the cron expression if a different cadence is needed.
+  schedule:
+    - cron: "0 2 * * *"
+
+  # Allow manual execution from the GitHub Actions tab.
+  workflow_dispatch:
+
+jobs:
+  qdrant-health-check:
+    name: Qdrant Health Check
+    runs-on: ubuntu-latest
+
+    # Minimal permissions — read-only access to the repository content.
+    permissions:
+      contents: read
+
+    steps:
+      # ----------------------------------------------------------------
+      # 1. Check out repository so scripts/ is available on the runner.
+      # ----------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------
+      # 2. Set up a minimal Python environment.
+      # ----------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ----------------------------------------------------------------
+      # 3. Install only the Qdrant client.
+      #    The full apps/api/requirements.txt is NOT installed here —
+      #    that would pull in FastAPI, PyMuPDF, etc. unnecessarily.
+      # ----------------------------------------------------------------
+      - name: Install qdrant-client
+        run: pip install "qdrant-client>=1.9.0"
+
+      # ----------------------------------------------------------------
+      # 4. Run the health check.
+      #    Credentials come exclusively from GitHub Repository Secrets.
+      #    They are never echoed, logged, or stored.
+      # ----------------------------------------------------------------
+      - name: Run Qdrant health check
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: python scripts/qdrant_health_check.py

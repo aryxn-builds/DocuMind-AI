@@ -39,6 +39,7 @@ DocuMind AI is a full-stack, production-ready AI workspace that allows users to 
 - [Performance Engineering](#performance-engineering)
 - [Known Limitations](#known-limitations)
 - [Future Improvements](#future-improvements)
+- [Qdrant Cloud Keep-Alive](#qdrant-cloud-keep-alive)
 
 ---
 
@@ -396,6 +397,69 @@ npm run build
 - **Advanced Reranking**: Implement Cohere or mixedbread-ai rerankers after the initial Qdrant retrieval step to boost citation accuracy.
 - **Hybrid Search**: Combine BM25 keyword search with Qdrant dense vectors for exact-match term queries (e.g., serial numbers).
 - **Observability**: Complete the Langfuse integration for tracing LLM latency and prompt evaluation.
+
+---
+
+## Qdrant Cloud Keep-Alive
+
+### Why it exists
+
+Qdrant's free-tier clusters may be automatically suspended after a period of inactivity.
+To prevent the cluster from going offline during active development and testing, this project
+includes a lightweight GitHub Actions workflow that sends a periodic, authenticated, **read-only**
+request to the cluster.
+
+### How it works
+
+The workflow runs **once per day at 02:00 UTC** via GitHub Actions and executes
+`scripts/qdrant_health_check.py`.
+
+The script:
+- Reads `QDRANT_URL` and `QDRANT_API_KEY` exclusively from environment variables.
+- Connects to Qdrant using the official `qdrant-client` library (already a project dependency).
+- Calls `client.get_collections()` — a single authenticated read that proves the cluster is
+  reachable without creating, modifying, or deleting any collections, vectors, or user data.
+- Exits `0` on success and non-zero on any failure, so GitHub Actions marks the run as failed
+  if the cluster is unreachable.
+
+The workflow does **not** start the FastAPI backend, build the frontend, run tests, or interact
+with any other infrastructure. It depends only on the Qdrant cluster being reachable.
+
+### Required GitHub Repository Secrets
+
+Add the following two secrets to your repository:
+
+**GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret name | Value |
+|---|---|
+| `QDRANT_URL` | Your Qdrant Cloud cluster URL (e.g. `https://xyz.qdrant.io:6333`) |
+| `QDRANT_API_KEY` | Your Qdrant REST API key from the Qdrant Cloud dashboard |
+
+> **Important**: Never commit actual credentials to this repository.
+> The workflow reads values exclusively from GitHub Secrets at runtime.
+
+### How to manually trigger the workflow
+
+1. Go to your repository on GitHub.
+2. Click the **Actions** tab.
+3. Select **Qdrant Cloud Keep-Alive** from the left sidebar.
+4. Click **Run workflow** → **Run workflow**.
+
+### How to verify a run succeeded
+
+1. Open the **Actions** tab on GitHub.
+2. Find the latest **Qdrant Cloud Keep-Alive** run.
+3. Open the **Qdrant Health Check** job.
+4. Expand the **Run Qdrant health check** step.
+5. Confirm the output contains:
+   ```
+   Qdrant health check started
+   Connecting to Qdrant cluster at <your-host> ...
+   Qdrant connection successful. Collections visible: N
+   Qdrant health check completed successfully
+   ```
+6. The step should exit with code `0` and the job should show a green checkmark.
 
 ---
 

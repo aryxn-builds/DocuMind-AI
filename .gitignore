@@ -97,13 +97,22 @@ desktop.ini
 # --------------------------------------------------
 docker-compose.override.yml
 
-# --------------------------------------------------
 # Misc
 # --------------------------------------------------
 *.db
 *.sqlite3
 *.log
+.ruff_cache/
 
-# Temp files
+# Temp & scratch files
 temp_token.txt
 apps/web/temp_token.txt
+profile_test.py
+scratch_test.py
+test_groq.py
+test.pdf
+test.png
+apps/api/test_*.pdf
+apps/api/rich_*.pdf
+apps/api/create_test_user_and_link.py
+apps/api/fix_data.py

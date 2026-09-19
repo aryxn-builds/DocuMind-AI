@@ -135,7 +135,7 @@ class EmbeddingService:
             # Build separate Content objects — one per text.
             contents = self._build_contents(texts)
 
-            retries = 3
+            retries = 4
             backoff = 2.0
             last_exc = None
 
@@ -179,14 +179,13 @@ class EmbeddingService:
                             )
                         if len(vector) != 768:
                             raise RuntimeError(
-                                f"Invalid embedding dimension at "
-                                f"index {idx}: {len(vector)}, "
-                                f"expected 768"
+                                f"Expected 768 dimensions, got "
+                                f"{len(vector)} at index {idx}"
                             )
-                        result.append((chunk, list(vector)))
+                        result.append((chunk, vector))
 
                     logger.info(
-                        f"[EMBEDDING] dimension=768 "
+                        f"[EMBEDDING] dimensions_verified=768 "
                         f"validation=passed"
                     )
                     logger.info(
@@ -203,7 +202,8 @@ class EmbeddingService:
                         f"{attempt + 1}/{retries} failed: {exc}"
                     )
                     if attempt < retries - 1:
-                        time.sleep(backoff)
+                        wait_time = 22.0 if ("429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc)) else backoff
+                        time.sleep(wait_time)
                         backoff *= 2
 
             if last_exc is not None:

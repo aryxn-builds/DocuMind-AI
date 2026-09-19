@@ -1,0 +1,201 @@
+{
+  "benchmark_timestamp": "2026-09-19T07:28:22Z",
+  "trials_standard": 20,
+  "trials_forced_fallback": 5,
+  "routing_metrics": {
+    "primary_success_rate": 30.0,
+    "fallback_activation_rate": 15.0,
+    "final_request_success_rate": 45.0,
+    "forced_fallback_success_rate": 0.0,
+    "total_system_availability": 45.0
+  },
+  "latency_metrics": {
+    "standard_flow_avg_s": 5.7213,
+    "standard_flow_p95_s": 12.5784,
+    "fallback_flow_avg_s": 0.0,
+    "fallback_flow_p95_s": 0.0
+  },
+  "cost_and_tokens": {
+    "avg_input_tokens_per_query": 87,
+    "avg_output_tokens_per_query": 681,
+    "avg_total_tokens_per_query": 768,
+    "groq_cost_per_query_usd": 5.9e-05,
+    "gemini_cost_per_query_usd": 0.000211,
+    "cost_per_1000_queries_usd": 0.2108,
+    "pricing_source": "Official provider published rates (Groq $0.05/$0.08 per 1M tokens, Google Cloud Gemini Flash $0.075/$0.30 per 1M tokens, Sept 2026)"
+  },
+  "normal_records": [
+    {
+      "trial": 1,
+      "provider": "groq",
+      "latency_s": 0.8646,
+      "success": true,
+      "output_chars": 385
+    },
+    {
+      "trial": 2,
+      "provider": "groq",
+      "latency_s": 1.7501,
+      "success": true,
+      "output_chars": 3555
+    },
+    {
+      "trial": 3,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0112,
+      "success": false,
+      "output_chars": 0
+    },
+    {
+      "trial": 4,
+      "provider": "groq",
+      "latency_s": 8.1214,
+      "success": true,
+      "output_chars": 4348
+    },
+    {
+      "trial": 5,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0104,
+      "success": false,
+      "output_chars": 0
+    },
+    {
+      "trial": 6,
+      "provider": "gemini",
+      "latency_s": 9.8809,
+      "success": true,
+      "output_chars": 263
+    },
+    {
+      "trial": 7,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0043,
+      "success": false,
+      "output_chars": 2534
+    },
+    {
+      "trial": 8,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0096,
+      "success": false,
+      "output_chars": 2173
+    },
+    {
+      "trial": 9,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0141,
+      "success": false,
+      "output_chars": 2196
+    },
+    {
+      "trial": 10,
+      "provider": "groq",
+      "latency_s": 1.4121,
+      "success": true,
+      "output_chars": 2702
+    },
+    {
+      "trial": 11,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0081,
+      "success": false,
+      "output_chars": 0
+    },
+    {
+      "trial": 12,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0074,
+      "success": false,
+      "output_chars": 2295
+    },
+    {
+      "trial": 13,
+      "provider": "groq",
+      "latency_s": 2.7091,
+      "success": true,
+      "output_chars": 5309
+    },
+    {
+      "trial": 14,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0034,
+      "success": false,
+      "output_chars": 0
+    },
+    {
+      "trial": 15,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0049,
+      "success": false,
+      "output_chars": 2139
+    },
+    {
+      "trial": 16,
+      "provider": "gemini",
+      "latency_s": 10.427,
+      "success": true,
+      "output_chars": 296
+    },
+    {
+      "trial": 17,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0119,
+      "success": false,
+      "output_chars": 2950
+    },
+    {
+      "trial": 18,
+      "provider": "groq",
+      "latency_s": 2.3134,
+      "success": true,
+      "output_chars": 4761
+    },
+    {
+      "trial": 19,
+      "provider": "timeout (15s exceeded)",
+      "latency_s": 15.0094,
+      "success": false,
+      "output_chars": 0
+    },
+    {
+      "trial": 20,
+      "provider": "gemini",
+      "latency_s": 14.0127,
+      "success": true,
+      "output_chars": 2906
+    }
+  ],
+  "fallback_records": [
+    {
+      "trial": 1,
+      "provider": "failed: Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}",
+      "latency_s": 0.4487,
+      "success": false
+    },
+    {
+      "trial": 2,
+      "provider": "failed: Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}",
+      "latency_s": 0.1014,
+      "success": false
+    },
+    {
+      "trial": 3,
+      "provider": "failed: Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}",
+      "latency_s": 0.0635,
+      "success": false
+    },
+    {
+      "trial": 4,
+      "provider": "failed: Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}",
+      "latency_s": 0.0698,
+      "success": false
+    },
+    {
+      "trial": 5,
+      "provider": "failed: Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}",
+      "latency_s": 0.0865,
+      "success": false
+    }
+  ]
+}

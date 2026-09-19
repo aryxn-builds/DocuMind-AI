@@ -58,7 +58,7 @@ class QdrantService:
             url = settings.qdrant_url
             api_key = settings.qdrant_api_key
 
-            kwargs: dict = {"url": url}
+            kwargs: dict = {"url": url, "timeout": 30.0}
             if api_key:
                 kwargs["api_key"] = api_key
 

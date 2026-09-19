@@ -1,0 +1,49 @@
+{
+  "benchmark_timestamp": "2026-09-19T07:31:33Z",
+  "process_resources": {
+    "initial_rss_mb": 92.02,
+    "initial_vms_mb": 430.0,
+    "peak_rss_mb": 103.74,
+    "peak_vms_mb": 438.54,
+    "cpu_utilization_pct": 5.7,
+    "system_total_ram_gb": 11.33,
+    "system_available_ram_gb": 2.42,
+    "logical_cpu_cores": 12,
+    "physical_cpu_cores": 6
+  },
+  "qdrant_vector_store": {
+    "collection_name": "document_chunks",
+    "status": "green",
+    "points_count": 825,
+    "indexed_vectors_count": 0,
+    "vector_dimension": 768,
+    "distance_metric": "COSINE",
+    "top_k_search_benchmarks": {
+      "k_1": {
+        "avg_ms": 392.24,
+        "min_ms": 374.19,
+        "max_ms": 423.95
+      },
+      "k_5": {
+        "avg_ms": 399.45,
+        "min_ms": 365.76,
+        "max_ms": 448.58
+      },
+      "k_10": {
+        "avg_ms": 395.49,
+        "min_ms": 363.8,
+        "max_ms": 479.59
+      },
+      "k_25": {
+        "avg_ms": 399.31,
+        "min_ms": 361.59,
+        "max_ms": 511.02
+      },
+      "k_50": {
+        "avg_ms": 419.92,
+        "min_ms": 376.65,
+        "max_ms": 505.36
+      }
+    }
+  }
+}

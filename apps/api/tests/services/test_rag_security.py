@@ -177,6 +177,7 @@ async def test_groq_4xx_no_gemini_fallback():
 
     from app.ai.gateway import _GROQ_NO_RETRY_STATUS, AIGateway
 
+    AIGateway._groq_permanently_failed = False
     for status_code in _GROQ_NO_RETRY_STATUS:
         gw = AIGateway()
         gw.gemini_api_key = "fake-gemini-key"  # Gemini is available

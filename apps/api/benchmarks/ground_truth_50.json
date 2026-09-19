@@ -1,0 +1,742 @@
+{
+  "documents": [
+    {
+      "id": "doc01",
+      "filename": "doc01_invoice_q1.pdf",
+      "type": "invoice",
+      "target_pages": 1
+    },
+    {
+      "id": "doc02",
+      "filename": "doc02_nda_agreement.pdf",
+      "type": "nda",
+      "target_pages": 2
+    },
+    {
+      "id": "doc03",
+      "filename": "doc03_executive_resume.pdf",
+      "type": "resume",
+      "target_pages": 2
+    },
+    {
+      "id": "doc04",
+      "filename": "doc04_security_incident_report.pdf",
+      "type": "postmortem",
+      "target_pages": 2
+    },
+    {
+      "id": "doc05",
+      "filename": "doc05_product_roadmap_memo.pdf",
+      "type": "memo",
+      "target_pages": 2
+    },
+    {
+      "id": "doc06",
+      "filename": "doc06_software_spec.pdf",
+      "type": "spec",
+      "target_pages": 4
+    },
+    {
+      "id": "doc07",
+      "filename": "doc07_quarterly_financial_report.pdf",
+      "type": "financial",
+      "target_pages": 5
+    },
+    {
+      "id": "doc08",
+      "filename": "doc08_hr_employee_handbook.pdf",
+      "type": "handbook",
+      "target_pages": 6
+    },
+    {
+      "id": "doc09",
+      "filename": "doc09_clinical_trial_protocol.pdf",
+      "type": "clinical",
+      "target_pages": 6
+    },
+    {
+      "id": "doc10",
+      "filename": "doc10_cloud_migration_guide.pdf",
+      "type": "technical",
+      "target_pages": 7
+    },
+    {
+      "id": "doc11",
+      "filename": "doc11_data_privacy_gdpr_policy.pdf",
+      "type": "legal",
+      "target_pages": 8
+    },
+    {
+      "id": "doc12",
+      "filename": "doc12_api_developer_guide.pdf",
+      "type": "api",
+      "target_pages": 8
+    },
+    {
+      "id": "doc13",
+      "filename": "doc13_cybersecurity_framework_audit.pdf",
+      "type": "security",
+      "target_pages": 10
+    },
+    {
+      "id": "doc14",
+      "filename": "doc14_ai_ethics_whitepaper.pdf",
+      "type": "whitepaper",
+      "target_pages": 15
+    },
+    {
+      "id": "doc15",
+      "filename": "doc15_distributed_consensus_research.pdf",
+      "type": "research",
+      "target_pages": 16
+    },
+    {
+      "id": "doc16",
+      "filename": "doc16_climate_sustainability_report.pdf",
+      "type": "report",
+      "target_pages": 18
+    },
+    {
+      "id": "doc17",
+      "filename": "doc17_enterprise_rfp_proposal.pdf",
+      "type": "proposal",
+      "target_pages": 20
+    },
+    {
+      "id": "doc18",
+      "filename": "doc18_pharmacokinetics_journal.pdf",
+      "type": "journal",
+      "target_pages": 22
+    },
+    {
+      "id": "doc19",
+      "filename": "doc19_semiconductor_supply_chain.pdf",
+      "type": "industry_report",
+      "target_pages": 25
+    },
+    {
+      "id": "doc20",
+      "filename": "doc20_global_macroeconomic_outlook.pdf",
+      "type": "macro_report",
+      "target_pages": 30
+    }
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "doc_id": "doc01",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the invoice number and issue date for the Acronis invoice?",
+      "ground_truth_answer": "Invoice #INV-2026-8841 was issued on January 15, 2026.",
+      "key_snippets": [
+        "INV-2026-8841",
+        "January 15, 2026"
+      ]
+    },
+    {
+      "id": "q02",
+      "doc_id": "doc01",
+      "category": "table",
+      "difficulty": "medium",
+      "query": "What was the unit price and total cost for the dedicated GPU cluster slicing?",
+      "ground_truth_answer": "The unit price was $3.50 per hour for 120 hours, totaling $420.00.",
+      "key_snippets": [
+        "$3.50",
+        "$420.00",
+        "Dedicated GPU Cluster Slicing"
+      ]
+    },
+    {
+      "id": "q03",
+      "doc_id": "doc01",
+      "category": "table",
+      "difficulty": "easy",
+      "query": "What is the grand total due on invoice INV-2026-8841?",
+      "ground_truth_answer": "The grand total due is $2,684.60, including $204.60 in sales tax.",
+      "key_snippets": [
+        "$2,684.60",
+        "$204.60"
+      ]
+    },
+    {
+      "id": "q04",
+      "doc_id": "doc01",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the late payment penalty fee specified in the invoice?",
+      "ground_truth_answer": "Late payments incur a 1.5% monthly compound penalty fee.",
+      "key_snippets": [
+        "1.5%",
+        "monthly compound penalty"
+      ]
+    },
+    {
+      "id": "q05",
+      "doc_id": "doc02",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "Who are the two parties that entered into the Mutual Non-Disclosure Agreement?",
+      "ground_truth_answer": "The Agreement is between Apex Ventures LLC and Helix Dynamics Corp.",
+      "key_snippets": [
+        "Apex Ventures LLC",
+        "Helix Dynamics Corp"
+      ]
+    },
+    {
+      "id": "q06",
+      "doc_id": "doc02",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What encryption standards are mandated for electronic documents under the NDA?",
+      "ground_truth_answer": "AES-256 encryption at rest and TLS 1.3 in transit.",
+      "key_snippets": [
+        "AES-256",
+        "TLS 1.3"
+      ]
+    },
+    {
+      "id": "q07",
+      "doc_id": "doc02",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "How long is the confidentiality term in effect and which state laws govern it?",
+      "ground_truth_answer": "The term is three (3) years and it is governed by the laws of the State of Delaware.",
+      "key_snippets": [
+        "three (3) years",
+        "State of Delaware"
+      ]
+    },
+    {
+      "id": "q08",
+      "doc_id": "doc02",
+      "category": "analytical",
+      "difficulty": "medium",
+      "query": "Under what conditions is information excluded from confidentiality under this agreement?",
+      "ground_truth_answer": "Information that becomes publicly known through no breach, is received from a third party without breach, or was independently developed.",
+      "key_snippets": [
+        "publicly known",
+        "independently developed",
+        "third party"
+      ]
+    },
+    {
+      "id": "q09",
+      "doc_id": "doc03",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What university did Dr. Sarah Chen receive her Ph.D. from?",
+      "ground_truth_answer": "Stanford University in 2018.",
+      "key_snippets": [
+        "Stanford University",
+        "2018"
+      ]
+    },
+    {
+      "id": "q10",
+      "doc_id": "doc03",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What is the patent number held by Dr. Sarah Chen and what is its title?",
+      "ground_truth_answer": "US Patent #11,489,203 titled 'Adaptive Vector Quantization for High-Throughput Approximate Nearest Neighbor Lookups'.",
+      "key_snippets": [
+        "11,489,203",
+        "Adaptive Vector Quantization"
+      ]
+    },
+    {
+      "id": "q11",
+      "doc_id": "doc03",
+      "category": "analytical",
+      "difficulty": "medium",
+      "query": "What key engineering metrics did Dr. Sarah Chen achieve at HyperScale Labs?",
+      "ground_truth_answer": "Indexed 800M vectors with 99.995% uptime, cut token latency by 42%, and reduced annual cloud costs by $1.8M.",
+      "key_snippets": [
+        "800M vectors",
+        "42%",
+        "$1.8M",
+        "99.995%"
+      ]
+    },
+    {
+      "id": "q12",
+      "doc_id": "doc03",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "How many TB of unstructured PDF data did Dr. Chen's pipeline process daily at Cognitive Dynamics?",
+      "ground_truth_answer": "12TB of unstructured PDF datasets per day.",
+      "key_snippets": [
+        "12TB",
+        "PDF datasets per day"
+      ]
+    },
+    {
+      "id": "q13",
+      "doc_id": "doc04",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What was the malicious dependency that caused security incident #SEC-2026-0419?",
+      "ground_truth_answer": "The compromised dependency was 'pdf-formatter-core' v1.2.8.",
+      "key_snippets": [
+        "pdf-formatter-core",
+        "v1.2.8"
+      ]
+    },
+    {
+      "id": "q14",
+      "doc_id": "doc04",
+      "category": "analytical",
+      "difficulty": "medium",
+      "query": "What was the external command-and-control server and exfiltration mechanism identified?",
+      "ground_truth_answer": "Base64 DNS tunneling to c2.shadow-network.org.",
+      "key_snippets": [
+        "c2.shadow-network.org",
+        "DNS tunneling"
+      ]
+    },
+    {
+      "id": "q15",
+      "doc_id": "doc04",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "Were customer documents compromised during incident SEC-2026-0419?",
+      "ground_truth_answer": "Zero customer documents were accessed; egress firewalls blocked 99.4% of outbound requests.",
+      "key_snippets": [
+        "0 documents",
+        "99.4%"
+      ]
+    },
+    {
+      "id": "q16",
+      "doc_id": "doc04",
+      "category": "analytical",
+      "difficulty": "hard",
+      "query": "What preventative measures were deployed following the security incident?",
+      "ground_truth_answer": "Hash-pinned SBOMs, eBPF-based runtime syscall enforcement, and multi-party code reviews.",
+      "key_snippets": [
+        "SBOM",
+        "eBPF",
+        "multi-party code reviews"
+      ]
+    },
+    {
+      "id": "q17",
+      "doc_id": "doc05",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the strategic revenue target for DocuMind AI by Q4 2026?",
+      "ground_truth_answer": "Reaching $4.5M ARR by Q4 2026 while maintaining 99.9% uptime SLA.",
+      "key_snippets": [
+        "$4.5M ARR",
+        "99.9% uptime"
+      ]
+    },
+    {
+      "id": "q18",
+      "doc_id": "doc05",
+      "category": "table",
+      "difficulty": "medium",
+      "query": "How much budget is allocated for GPU compute and who is the vendor in the H2 roadmap?",
+      "ground_truth_answer": "$320,000 allocated to Lambda Labs / RunPod to support 50k concurrent requests.",
+      "key_snippets": [
+        "$320,000",
+        "Lambda Labs",
+        "50k concurrent requests"
+      ]
+    },
+    {
+      "id": "q19",
+      "doc_id": "doc05",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What retrieval feature is scheduled for release v2.0 in Q3?",
+      "ground_truth_answer": "Deep Hybrid Retrieval combining BM25 lexical keyword matching with dense vector representations from Gemini-Embedding-2.",
+      "key_snippets": [
+        "Deep Hybrid Retrieval",
+        "BM25",
+        "Gemini-Embedding-2"
+      ]
+    },
+    {
+      "id": "q20",
+      "doc_id": "doc05",
+      "category": "table",
+      "difficulty": "easy",
+      "query": "What is the budget allocation for Managed Vector Storage in H2?",
+      "ground_truth_answer": "$140,000 allocated to Qdrant Cloud Enterprise.",
+      "key_snippets": [
+        "$140,000",
+        "Qdrant Cloud Enterprise"
+      ]
+    },
+    {
+      "id": "q21",
+      "doc_id": "doc06",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What is the capacity of the Layer 1 local LRU cache in the distributed caching specification?",
+      "ground_truth_answer": "5,000 item capacity using Python cachetools.",
+      "key_snippets": [
+        "5,000",
+        "LRU cache",
+        "cachetools"
+      ]
+    },
+    {
+      "id": "q22",
+      "doc_id": "doc06",
+      "category": "analytical",
+      "difficulty": "hard",
+      "query": "What are the exact TTL rules for document embeddings versus semantic queries?",
+      "ground_truth_answer": "Document embeddings have a TTL of strictly 14 days, while semantic queries expire after 4 hours.",
+      "key_snippets": [
+        "14 days",
+        "4 hours"
+      ]
+    },
+    {
+      "id": "q23",
+      "doc_id": "doc06",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What circuit breaker failure threshold triggers the transition to the OPEN state?",
+      "ground_truth_answer": "Failure rate exceeding 25% over a 60-second window with at least 40 requests.",
+      "key_snippets": [
+        "25%",
+        "60-second window",
+        "40 requests"
+      ]
+    },
+    {
+      "id": "q24",
+      "doc_id": "doc06",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "How frequently are Redis RDB snapshots pushed to S3 and to which AWS region?",
+      "ground_truth_answer": "Every 3 hours to encrypted S3 buckets in us-east-1.",
+      "key_snippets": [
+        "3 hours",
+        "us-east-1"
+      ]
+    },
+    {
+      "id": "q25",
+      "doc_id": "doc07",
+      "category": "table",
+      "difficulty": "easy",
+      "query": "What was the total full-year revenue for Nexus Technologies in 2025?",
+      "ground_truth_answer": "$142.8M total revenue for full year 2025.",
+      "key_snippets": [
+        "$142.8M",
+        "Full Year 2025"
+      ]
+    },
+    {
+      "id": "q26",
+      "doc_id": "doc07",
+      "category": "table",
+      "difficulty": "medium",
+      "query": "How much revenue was generated from Cloud Subscriptions in Q3 2025?",
+      "ground_truth_answer": "$30.8M from Cloud Subscriptions in Q3 2025.",
+      "key_snippets": [
+        "$30.8M",
+        "Q3 2025"
+      ]
+    },
+    {
+      "id": "q27",
+      "doc_id": "doc07",
+      "category": "analytical",
+      "difficulty": "medium",
+      "query": "What percentage of total operating expenses was dedicated to R&D in 2025?",
+      "ground_truth_answer": "R&D represented $48.2M, or 49.0% of total operating expenses.",
+      "key_snippets": [
+        "$48.2M",
+        "49.0%"
+      ]
+    },
+    {
+      "id": "q28",
+      "doc_id": "doc07",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "How much cash and cash equivalents did Nexus Technologies hold at the end of 2025?",
+      "ground_truth_answer": "$68.4M in cash and cash equivalents, plus $24.0M in US Treasury bills.",
+      "key_snippets": [
+        "$68.4M",
+        "$24.0M"
+      ]
+    },
+    {
+      "id": "q29",
+      "doc_id": "doc08",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What are the core collaboration hours required by Vortex Global?",
+      "ground_truth_answer": "10:00 AM to 3:00 PM in each employee's local timezone.",
+      "key_snippets": [
+        "10:00 AM to 3:00 PM"
+      ]
+    },
+    {
+      "id": "q30",
+      "doc_id": "doc08",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the home-office setup stipend and monthly internet reimbursement?",
+      "ground_truth_answer": "$1,500 initial setup stipend and $150 monthly reimbursement.",
+      "key_snippets": [
+        "$1,500",
+        "$150 monthly"
+      ]
+    },
+    {
+      "id": "q31",
+      "doc_id": "doc08",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "How many days of paid vacation and sick leave are employees entitled to annually?",
+      "ground_truth_answer": "25 days of vacation leave and 10 days of paid sick leave.",
+      "key_snippets": [
+        "25 days",
+        "10 days"
+      ]
+    },
+    {
+      "id": "q32",
+      "doc_id": "doc08",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What is the 401(k) company match offered by Vortex Global?",
+      "ground_truth_answer": "100% match on the first 5% of salary, vesting immediately on day one.",
+      "key_snippets": [
+        "100%",
+        "first 5%",
+        "vesting immediately"
+      ]
+    },
+    {
+      "id": "q33",
+      "doc_id": "doc09",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What disease condition is being treated in the clinical trial for VX-709?",
+      "ground_truth_answer": "Moderate-to-severe ulcerative colitis.",
+      "key_snippets": [
+        "ulcerative colitis",
+        "moderate-to-severe"
+      ]
+    },
+    {
+      "id": "q34",
+      "doc_id": "doc09",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What are the age requirements for patient inclusion in protocol NCT05829104?",
+      "ground_truth_answer": "Age 18 to 70 years at the time of signing consent.",
+      "key_snippets": [
+        "18 to 70 years"
+      ]
+    },
+    {
+      "id": "q35",
+      "doc_id": "doc09",
+      "category": "analytical",
+      "difficulty": "hard",
+      "query": "What are the three treatment arms and dosage strengths in the study?",
+      "ground_truth_answer": "Arm A (15mg once daily), Arm B (30mg once daily), Arm C (matched placebo once daily).",
+      "key_snippets": [
+        "15mg",
+        "30mg",
+        "Placebo"
+      ]
+    },
+    {
+      "id": "q36",
+      "doc_id": "doc09",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "Within what timeframe must Serious Adverse Events be reported to the Medical Monitor?",
+      "ground_truth_answer": "Within 24 hours of site awareness.",
+      "key_snippets": [
+        "24 hours",
+        "Serious Adverse Events"
+      ]
+    },
+    {
+      "id": "q37",
+      "doc_id": "doc10",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "How many microservices are targeted for migration to Amazon EKS within 180 days?",
+      "ground_truth_answer": "42 core microservices.",
+      "key_snippets": [
+        "42 core microservices",
+        "180 days"
+      ]
+    },
+    {
+      "id": "q38",
+      "doc_id": "doc10",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What database migration tool is used to move PostgreSQL to Aurora and what is the downtime window?",
+      "ground_truth_answer": "AWS Database Migration Service (DMS) with continuous CDC; cutover downtime window under 15 minutes.",
+      "key_snippets": [
+        "AWS Database Migration Service",
+        "15 minutes"
+      ]
+    },
+    {
+      "id": "q39",
+      "doc_id": "doc10",
+      "category": "analytical",
+      "difficulty": "medium",
+      "query": "What are the RTO and RPO disaster recovery targets across AWS regions?",
+      "ground_truth_answer": "RTO under 30 minutes and RPO under 5 minutes between us-east-1 and us-west-2.",
+      "key_snippets": [
+        "RTO",
+        "30 minutes",
+        "RPO",
+        "5 minutes"
+      ]
+    },
+    {
+      "id": "q40",
+      "doc_id": "doc11",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the contact email and address for the Data Protection Officer?",
+      "ground_truth_answer": "dpo@documind.eu at Rue de la Loi 200, 1040 Brussels, Belgium.",
+      "key_snippets": [
+        "dpo@documind.eu",
+        "Brussels"
+      ]
+    },
+    {
+      "id": "q41",
+      "doc_id": "doc11",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "Within how many calendar days must a Data Subject Access Request (DSAR) be fulfilled?",
+      "ground_truth_answer": "Within thirty (30) calendar days.",
+      "key_snippets": [
+        "thirty (30) calendar days",
+        "30"
+      ]
+    },
+    {
+      "id": "q42",
+      "doc_id": "doc11",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What is the maximum administrative fine under GDPR Article 83?",
+      "ground_truth_answer": "Up to \u20ac20,000,000 or 4% of total worldwide annual turnover.",
+      "key_snippets": [
+        "\u20ac20,000,000",
+        "4%"
+      ]
+    },
+    {
+      "id": "q43",
+      "doc_id": "doc12",
+      "category": "factual",
+      "difficulty": "easy",
+      "query": "What is the production base URL for the DocuMind API?",
+      "ground_truth_answer": "https://api.documind.ai/v1",
+      "key_snippets": [
+        "https://api.documind.ai/v1"
+      ]
+    },
+    {
+      "id": "q44",
+      "doc_id": "doc12",
+      "category": "factual",
+      "difficulty": "medium",
+      "query": "What are the default rate limits for the Standard Tier API keys?",
+      "ground_truth_answer": "120 requests per minute and 10,000 requests per day.",
+      "key_snippets": [
+        "120 requests per minute",
+        "10,000 requests per day"
+      ]
+    },
+    {
+      "id": "q45",
+      "doc_id": "doc18",
+      "category": "analytical",
+      "difficulty": "hard",
+      "query": "What was the mean elimination half-life and primary clearance pathway for the kinase inhibitor?",
+      "ground_truth_answer": "Half-life of 14.8 hours with predominant hepatic metabolism via CYP3A4.",
+      "key_snippets": [
+        "14.8 hours",
+        "CYP3A4",
+        "hepatic metabolism"
+      ]
+    },
+    {
+      "id": "q46",
+      "doc_id": null,
+      "category": "out_of_scope",
+      "difficulty": "easy",
+      "query": "What was the final score of the 2026 FIFA World Cup championship match?",
+      "ground_truth_answer": "The document does not contain this information.",
+      "key_snippets": [
+        "not contain",
+        "unsupported",
+        "cannot find"
+      ]
+    },
+    {
+      "id": "q47",
+      "doc_id": null,
+      "category": "out_of_scope",
+      "difficulty": "easy",
+      "query": "What is the secret recipe for Kentucky Fried Chicken?",
+      "ground_truth_answer": "The document does not contain this information.",
+      "key_snippets": [
+        "not contain",
+        "unsupported",
+        "cannot find"
+      ]
+    },
+    {
+      "id": "q48",
+      "doc_id": null,
+      "category": "out_of_scope",
+      "difficulty": "medium",
+      "query": "What is the exact stock price of Apple Inc. on December 1, 2029?",
+      "ground_truth_answer": "The document does not contain this information.",
+      "key_snippets": [
+        "not contain",
+        "unsupported",
+        "cannot find"
+      ]
+    },
+    {
+      "id": "q49",
+      "doc_id": null,
+      "category": "out_of_scope",
+      "difficulty": "medium",
+      "query": "Who won the Academy Award for Best Actor in the year 1954?",
+      "ground_truth_answer": "The document does not contain this information.",
+      "key_snippets": [
+        "not contain",
+        "unsupported",
+        "cannot find"
+      ]
+    },
+    {
+      "id": "q50",
+      "doc_id": null,
+      "category": "out_of_scope",
+      "difficulty": "easy",
+      "query": "How do you manufacture enriched uranium centrifuges at home?",
+      "ground_truth_answer": "The document does not contain this information.",
+      "key_snippets": [
+        "not contain",
+        "unsupported",
+        "cannot find"
+      ]
+    }
+  ]
+}

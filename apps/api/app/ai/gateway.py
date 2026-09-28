@@ -38,6 +38,7 @@ class AIGateway:
         self._gemini_client_loop = None
 
         self.groq_model = settings.groq_model
+        self.groq_fallback_model = getattr(settings, 'groq_fallback_model', 'openai/gpt-oss-120b')
         self.gemini_model = settings.gemini_chat_model
 
     @observe(name="ai_gateway.stream_chat", capture_input=False, capture_output=False)
@@ -52,37 +53,65 @@ class AIGateway:
 
         if self.groq_api_key and not self.__class__._groq_permanently_failed:
             try:
-                logger.info("Attempting primary LLM provider (Groq)")
-                async for chunk in self._stream_groq(messages):
+                logger.info(f"Attempting primary LLM provider (Groq: {self.groq_model})")
+                yielded_any = False
+                async for chunk in self._stream_groq(messages, model=self.groq_model):
+                    yielded_any = True
                     if ttft_ms is None:
                         ttft_ms = int((time.perf_counter() - start_time) * 1000)
                     yield chunk
-                await _log_perf("groq")
-                return
+                if yielded_any:
+                    await _log_perf("groq")
+                    return
+                logger.warning(f"Groq primary model ({self.groq_model}) returned 0 tokens. Falling back.")
             except GroqAPIStatusError as e:
                 status_code = getattr(e, 'status_code', 500)
-                if status_code == 404:
-                    logger.error(f"Groq rejected request (404). Disabling Groq: {e}")
-                    self.__class__._groq_permanently_failed = True
-                elif status_code in _GROQ_NO_RETRY_STATUS:
+                if status_code in _GROQ_NO_RETRY_STATUS:
                     logger.error(f"Groq rejected request ({status_code}): {e}")
                     await _log_perf("groq", error=str(status_code))
                     raise
                 else:
-                    logger.error(f"Groq server/network error, attempting Gemini fallback: {e}")
+                    logger.warning(f"Groq primary model ({self.groq_model}) failed ({status_code}): {e}")
             except Exception as e:
-                logger.error(f"Groq unexpected error, attempting Gemini fallback: {e}")
+                logger.warning(f"Groq primary model ({self.groq_model}) unexpected error: {e}")
+
+            if self.groq_fallback_model and self.groq_fallback_model != self.groq_model:
+                try:
+                    logger.info(f"Attempting secondary LLM provider (Groq fallback: {self.groq_fallback_model})")
+                    yielded_any = False
+                    async for chunk in self._stream_groq(messages, model=self.groq_fallback_model):
+                        yielded_any = True
+                        if ttft_ms is None:
+                            ttft_ms = int((time.perf_counter() - start_time) * 1000)
+                        yield chunk
+                    if yielded_any:
+                        await _log_perf("groq_secondary", fallback=True)
+                        return
+                    logger.warning(f"Groq secondary model ({self.groq_fallback_model}) returned 0 tokens. Falling back.")
+                except GroqAPIStatusError as e:
+                    status_code = getattr(e, 'status_code', 500)
+                    if status_code in _GROQ_NO_RETRY_STATUS:
+                        logger.error(f"Groq fallback rejected request ({status_code}): {e}")
+                        await _log_perf("groq_secondary", error=str(status_code))
+                        raise
+                    logger.warning(f"Groq secondary model failed ({status_code}): {e}")
+                except Exception as e:
+                    logger.warning(f"Groq secondary model unexpected error: {e}")
 
         if self.gemini_api_key:
             logger.info(f"Attempting fallback LLM provider (Gemini: {self.gemini_model})")
             try:
                 ttft_ms = None  # reset ttft for fallback
+                yielded_any = False
                 async for chunk in self._stream_gemini(messages, model=self.gemini_model):
+                    yielded_any = True
                     if ttft_ms is None:
                         ttft_ms = int((time.perf_counter() - start_time) * 1000)
                     yield chunk
-                await _log_perf("gemini", fallback=True)
-                return
+                if yielded_any:
+                    await _log_perf("gemini", fallback=True)
+                    return
+                logger.warning(f"Primary Gemini model ({self.gemini_model}) returned 0 tokens. Falling back.")
             except Exception as e:
                 logger.error(f"Primary Gemini model ({self.gemini_model}) failed: {e}")
                 
@@ -91,12 +120,15 @@ class AIGateway:
                     logger.info(f"Attempting secondary LLM provider (Gemini fallback: {gemini_fallback})")
                     try:
                         ttft_ms = None
+                        yielded_any = False
                         async for chunk in self._stream_gemini(messages, model=gemini_fallback):
+                            yielded_any = True
                             if ttft_ms is None:
                                 ttft_ms = int((time.perf_counter() - start_time) * 1000)
                             yield chunk
-                        await _log_perf("gemini_secondary", fallback=True)
-                        return
+                        if yielded_any:
+                            await _log_perf("gemini_secondary", fallback=True)
+                            return
                     except Exception as secondary_err:
                         logger.error(f"Secondary Gemini fallback ({gemini_fallback}) also failed: {secondary_err}")
                         await _log_perf("gemini_secondary", error="fallback_failed", fallback=True)
@@ -104,16 +136,17 @@ class AIGateway:
         await _log_perf("none", error="all_failed")
         raise RuntimeError("No LLM providers available or all providers failed.")
 
-    async def _stream_groq(self, messages: list[dict[str, Any]]) -> AsyncGenerator[dict[str, Any], None]:
+    async def _stream_groq(self, messages: list[dict[str, Any]], model: str = None) -> AsyncGenerator[dict[str, Any], None]:
         import groq
         current_loop = asyncio.get_running_loop()
         if not self.groq_client or self._groq_client_loop is not current_loop:
             self.groq_client = groq.AsyncGroq(api_key=self.groq_api_key)
             self._groq_client_loop = current_loop
             
+        use_model = model or self.groq_model
         stream = await self.groq_client.chat.completions.create(
             messages=messages,
-            model=self.groq_model,
+            model=use_model,
             temperature=0.1,
             stream=True
         )
@@ -122,7 +155,7 @@ class AIGateway:
             if content:
                 yield {
                     "content": content,
-                    "model": self.groq_model,
+                    "model": use_model,
                     "provider": "groq"
                 }
 

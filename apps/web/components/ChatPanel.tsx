@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Sparkles, Send, Bot, User } from 'lucide-react'
+import { Sparkles, Send, Bot, AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 type Citation = {
@@ -119,6 +119,10 @@ export function ChatPanel({
   // whether a stream is currently active before overwriting React state.
   const isStreamingRef = useRef(false)
 
+  // Track the ID of the conversation whose messages are currently loaded in state.
+  // This prevents redundant/stale GET requests from wiping in-flight or streaming messages.
+  const loadedConversationIdRef = useRef<string | null>(null)
+
   // Keep a stable ref to the access token so async callbacks always have the
   // latest value without needing to be in the dependency array.
   const accessTokenRef = useRef(accessToken)
@@ -148,11 +152,18 @@ export function ChatPanel({
   // Load conversation history
   //
   // Guard: if a stream is currently active for this conversation, skip the
-  // setMessages call.  The stream owns the state until it completes.
+  // setMessages call. The stream owns the state until it completes.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!activeConversationId) {
+      loadedConversationIdRef.current = null
       setMessages([])
+      return
+    }
+
+    // Guard: If this conversation is already loaded or is currently being created/streamed locally,
+    // do not trigger a stale network fetch that would overwrite client state.
+    if (loadedConversationIdRef.current === activeConversationId) {
       return
     }
 
@@ -168,7 +179,7 @@ export function ChatPanel({
         })
 
         if (res.ok && isMounted) {
-          // Bug 3 fix: do NOT overwrite state if a stream is in progress.
+          // Do NOT overwrite state if a stream is in progress.
           // The streaming handler owns the message list while isStreamingRef is true.
           if (isStreamingRef.current) {
             console.log(
@@ -184,7 +195,17 @@ export function ChatPanel({
             `[PERF_CHAT] conversation_load_ms=${loadMs} conversation_id=${activeConversationId} ` +
               `message_count=${(data.messages || []).length}`
           )
-          setMessages(data.messages || [])
+
+          loadedConversationIdRef.current = activeConversationId
+          setMessages(prev => {
+            const incoming: Message[] = data.messages || []
+            // If the client state already has more messages than the incoming server response
+            // (e.g. optimistic or streaming), do not overwrite with an older snapshot.
+            if (prev.length > incoming.length) {
+              return prev
+            }
+            return incoming
+          })
         }
       } catch (e: unknown) {
         const err = e as { name?: string }
@@ -220,7 +241,14 @@ export function ChatPanel({
           const data = await res.json()
           const msgs: Message[] = data.messages || []
           if (msgs.length > 0) {
-            setMessages(msgs)
+            setMessages(prev => {
+              // Safety guard: only replace if we don't already have an assistant response with content
+              const last = prev[prev.length - 1]
+              if (last?.role === 'assistant' && last.content.trim().length > 0) {
+                return prev
+              }
+              return msgs
+            })
             console.log(
               `[CHAT_FALLBACK] recovered ${msgs.length} messages from DB for conversation_id=${conversationId}`
             )
@@ -260,9 +288,9 @@ export function ChatPanel({
           if (res.ok) {
             const data = await res.json()
             currentConvoId = data.id
-            // NOTE: onConversationCreated triggers setActiveConversationId in the parent,
-            // which triggers the conversation-load useEffect.  We set isStreamingRef
-            // BEFORE calling it so the guard fires in time.
+            // Mark this conversation as already loaded locally so the subsequent activeConversationId
+            // update does not trigger a stale fetchConversation() request.
+            loadedConversationIdRef.current = data.id
             isStreamingRef.current = true
             setIsStreaming(true)
             onConversationCreated(data.id)
@@ -275,6 +303,7 @@ export function ChatPanel({
           return
         }
       } else {
+        loadedConversationIdRef.current = currentConvoId
         isStreamingRef.current = true
         setIsStreaming(true)
       }
@@ -322,13 +351,7 @@ export function ChatPanel({
           throw new Error('Response body is not readable')
         }
 
-        // ----- PROPER SSE PARSING (Bug 1 + Bug 2 fix) -----
-        //
-        // We maintain a persistent buffer across all reader.read() calls.
-        // extractSseEvents() splits on \n\n and returns only complete frames.
-        // The remainder (incomplete frame) stays in the buffer for the next chunk.
-        // After the reader is done, we do one final flush of whatever remains.
-
+        // Maintain persistent buffer across all reader.read() calls.
         let buffer = ''
         let readerDone = false
 
@@ -336,20 +359,18 @@ export function ChatPanel({
           const { value, done } = await reader.read()
           readerDone = done
 
-          // Bug 2 fix: decode even on the final chunk (done=true, value may have data)
+          // Decode even on the final chunk (done=true, value may have data)
           if (value) {
             buffer += decoder.decode(value, { stream: !done })
           }
 
-          // Final flush: when the reader is done, decode any remaining bytes
-          // the TextDecoder held internally (e.g. multi-byte UTF-8 boundary).
+          // Final flush when the reader is done
           if (done) {
-            const tail = decoder.decode() // flush internal buffer
+            const tail = decoder.decode()
             if (tail) buffer += tail
           }
 
-          // Process all complete SSE frames in the buffer right now.
-          // extractSseEvents returns the leftover (incomplete frame) as `remaining`.
+          // Process all complete SSE frames in the buffer right now
           const { events, remaining } = extractSseEvents(buffer)
           buffer = remaining
 
@@ -367,6 +388,8 @@ export function ChatPanel({
                 const last = next[next.length - 1]
                 if (last?.role === 'assistant') {
                   next[next.length - 1] = { ...last, content: last.content + token }
+                } else {
+                  next.push({ role: 'assistant', content: token })
                 }
                 return next
               })
@@ -376,6 +399,8 @@ export function ChatPanel({
                 const last = next[next.length - 1]
                 if (last?.role === 'assistant') {
                   next[next.length - 1] = { ...last, citations: event.citations }
+                } else {
+                  next.push({ role: 'assistant', content: '', citations: event.citations })
                 }
                 return next
               })
@@ -389,20 +414,18 @@ export function ChatPanel({
                 }
                 return next
               })
-              // Treat error as terminal — stop reading.
               readerDone = true
               break
             } else if (event.kind === 'done') {
               const ttotal = Math.round(performance.now() - t_send)
               console.log(`[PERF_CHAT] stream_completed_ms=${ttotal}`)
-              // Mark done — let the outer loop finish normally (don't break;
-              // the reader may already be exhausted or have one last read returning done=true).
             }
           }
         }
 
-        // ----- Bug 4 fix: fallback fetch if stream produced no content -----
+        // Fallback fetch if stream produced no content (wait 400ms for backend DB commit)
         if (assistantContent === '' && currentConvoId) {
+          await new Promise(r => setTimeout(r, 400))
           await fetchConversationFallback(currentConvoId)
         }
 
@@ -410,7 +433,6 @@ export function ChatPanel({
       } catch (e) {
         console.error('[CHAT] stream error', e)
 
-        // Show error in the assistant bubble rather than leaving it empty.
         setMessages(prev => {
           const next = [...prev]
           const last = next[next.length - 1]
@@ -423,12 +445,12 @@ export function ChatPanel({
           return next
         })
 
-        // Attempt to recover persisted content even after a client-side error.
+        // Attempt to recover persisted content even after a client-side error
         if (assistantContent === '' && currentConvoId) {
+          await new Promise(r => setTimeout(r, 400))
           await fetchConversationFallback(currentConvoId).catch(() => {})
         }
       } finally {
-        // Always clear streaming state — no matter what path exits.
         isStreamingRef.current = false
         setIsStreaming(false)
       }
@@ -446,27 +468,28 @@ export function ChatPanel({
   )
 
   // ---------------------------------------------------------------------------
-  // Render
+  // Render (Aligned with design-system/pages/chat.md and MASTER.md)
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-zinc-950 font-sans">
-      <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-800 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+    <div className="flex flex-col h-full bg-[#0A0A0A] font-sans border-l border-[#262626]">
+      {/* Header */}
+      <div className="shrink-0 border-b border-[#262626] px-4 py-3 bg-[#0A0A0A] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-[#171717] border border-[#262626] flex items-center justify-center shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-[#FFFFFF]" />
           </div>
           <div>
-            <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">DocuMind AI</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Ask questions about this document</p>
+            <h3 className="font-semibold text-xs tracking-tight text-[#FFFFFF]">DocuMind AI</h3>
+            <p className="text-[11px] text-[#737373]">Ask questions about this document</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Depth:</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-mono text-[#737373]">Depth:</span>
           <select
             value={answerDepth}
             onChange={e => setAnswerDepth(e.target.value as 'low' | 'medium' | 'high')}
-            className="text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="text-xs font-mono bg-[#111111] border border-[#262626] rounded-md px-2 py-1 text-[#E5E5E5] focus:outline-none focus:border-[#404040]"
           >
             <option value="low">Low (Concise)</option>
             <option value="medium">Medium (Balanced)</option>
@@ -475,85 +498,79 @@ export function ChatPanel({
         </div>
       </div>
 
+      {/* Messages */}
       <div
         ref={chatContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6"
+        className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 space-y-6"
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-4">
-              <Bot className="w-6 h-6 text-zinc-400" />
+            <div className="w-9 h-9 rounded-lg bg-[#111111] border border-[#262626] flex items-center justify-center mb-3">
+              <Bot className="w-4 h-4 text-[#A3A3A3]" />
             </div>
-            <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1">How can I help you today?</h4>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-[250px]">
-              Ask me anything about the content of this document and I&apos;ll find the answers.
+            <h4 className="text-xs font-medium text-[#FFFFFF] mb-1">Document Assistant Ready</h4>
+            <p className="text-xs text-[#737373] max-w-[260px] leading-relaxed">
+              Ask anything about this document. Citations are verified against source pages.
             </p>
           </div>
         ) : (
           messages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-800 mt-0.5">
-                  <Bot className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+            <div key={i} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'user' ? (
+                /* User Message: Right-aligned text block, subtle 8px radius, elevated surface per chat.md */
+                <div className="max-w-[85%] rounded-[8px] bg-[#111111] border border-[#262626] px-3.5 py-2.5 text-xs text-[#FFFFFF] leading-relaxed whitespace-pre-wrap break-words">
+                  {msg.content}
                 </div>
-              )}
+              ) : (
+                /* AI Response: Left-aligned, transparent background, structured research text */
+                <div className="w-full bg-transparent px-0.5 py-1 text-xs leading-relaxed text-[#E5E5E5]">
+                  {msg.content.includes('[System Error:') ? (
+                    <div className="rounded-[8px] bg-red-950/20 border border-red-800/40 p-3 text-xs text-red-400 font-mono flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 whitespace-pre-wrap break-words">{msg.content.replace(/^[\n\s]+/, '')}</div>
+                    </div>
+                  ) : msg.content === '' && isStreaming && i === messages.length - 1 ? (
+                    <div className="flex items-center gap-1.5 h-5 text-[#737373]">
+                      <span className="w-1.5 h-1.5 bg-[#737373] rounded-full animate-pulse [animation-delay:-0.3s]"></span>
+                      <span className="w-1.5 h-1.5 bg-[#737373] rounded-full animate-pulse [animation-delay:-0.15s]"></span>
+                      <span className="w-1.5 h-1.5 bg-[#737373] rounded-full animate-pulse"></span>
+                    </div>
+                  ) : (
+                    <div className="prose prose-invert prose-xs max-w-none break-words text-[#E5E5E5] [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:text-white [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:text-white [&_h3]:text-xs [&_h3]:font-medium [&_h3]:text-[#A3A3A3] [&_p]:leading-relaxed [&_code]:font-mono [&_code]:text-[11px] [&_pre]:bg-[#111111] [&_pre]:border [&_pre]:border-[#262626] [&_pre]:rounded-md [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+                      <ReactMarkdown>{msg.content.replace(/\[Source:\s*(\d+)\]/gi, '[$1]')}</ReactMarkdown>
+                    </div>
+                  )}
 
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'bg-zinc-50 text-zinc-900 dark:bg-zinc-900/50 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800/80 shadow-sm'
-                }`}
-              >
-                {msg.role === 'assistant' ? (
-                  <div className="flex flex-col gap-4">
-                    {msg.content === '' && isStreaming && i === messages.length - 1 ? (
-                      <div className="flex items-center gap-1.5 h-6">
-                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"></span>
-                      </div>
-                    ) : (
-                      <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                        <ReactMarkdown>{msg.content.replace(/\[Source:\s*(\d+)\]/gi, '[$1]')}</ReactMarkdown>
-                      </div>
-                    )}
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-2 border-t border-zinc-200 dark:border-zinc-800 pt-3 flex flex-wrap gap-2">
-                        {msg.citations.map((c, idx) => (
-                          <div
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-200/50 dark:bg-zinc-800 rounded text-[11px] font-medium text-zinc-600 dark:text-zinc-400 cursor-default"
-                            title={`Document source (Score: ${c.relevance_score.toFixed(2)})`}
-                          >
-                            <span>[{idx + 1}]</span>
-                            <span>{c.filename || 'Document'} {c.page_number ? `(Page ${c.page_number})` : ''}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
-                )}
-              </div>
-
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center shrink-0 mt-0.5">
-                  <User className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                  {/* Citations / Source Cards */}
+                  {msg.citations && msg.citations.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#262626] flex flex-wrap gap-1.5">
+                      {msg.citations.map((c, idx) => (
+                        <div
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#111111] hover:bg-[#171717] border border-[#262626] rounded-md text-[11px] font-mono text-[#A3A3A3] transition-colors cursor-default"
+                          title={`Relevance Score: ${c.relevance_score.toFixed(2)}`}
+                        >
+                          <span className="text-[#FFFFFF] font-medium">[{idx + 1}]</span>
+                          <span className="truncate max-w-[140px]">{c.filename || 'Document'}</span>
+                          {c.page_number && <span className="text-[#737373]">p.{c.page_number}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))
         )}
-        <div ref={messagesEndRef} className="h-4" />
+        <div ref={messagesEndRef} className="h-2" />
       </div>
 
-      <div className="shrink-0 p-4 bg-white dark:bg-zinc-950">
+      {/* Composer (Input Area) */}
+      <div className="shrink-0 p-3.5 bg-[#0A0A0A] border-t border-[#262626]">
         <form
           onSubmit={handleSubmit}
-          className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100 transition-shadow"
+          className="relative flex items-end gap-2 bg-[#111111] border border-[#262626] rounded-lg p-2 focus-within:border-[#404040] transition-colors"
         >
           <textarea
             value={input}
@@ -565,20 +582,21 @@ export function ChatPanel({
               }
             }}
             disabled={isStreaming}
-            placeholder={isStreaming ? 'AI is typing...' : 'Ask a question...'}
-            className="flex-1 min-h-[44px] max-h-[150px] resize-none bg-transparent px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
+            placeholder={isStreaming ? 'Generating response...' : 'Ask a question about this document...'}
+            className="flex-1 min-h-[38px] max-h-[140px] resize-none bg-transparent px-2 py-1 text-xs text-[#FFFFFF] placeholder:text-[#737373] focus:outline-none disabled:opacity-50"
             rows={1}
           />
           <button
             type="submit"
             disabled={isStreaming || !input.trim()}
-            className="shrink-0 flex items-center justify-center w-[44px] h-[44px] rounded-full bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:hover:bg-zinc-900 dark:disabled:hover:bg-zinc-100"
+            className="shrink-0 flex items-center justify-center w-7 h-7 rounded-md bg-[#FFFFFF] text-[#000000] hover:bg-[#E5E5E5] transition-colors disabled:opacity-30 disabled:hover:bg-[#FFFFFF]"
+            title="Send question"
           >
-            <Send className="w-4 h-4 translate-x-[-1px] translate-y-[1px]" />
+            <Send className="w-3.5 h-3.5" />
           </button>
         </form>
-        <div className="text-center mt-3">
-          <p className="text-[11px] text-zinc-400 font-medium">AI can make mistakes. Check important info.</p>
+        <div className="text-center mt-2">
+          <p className="text-[10px] text-[#737373] font-mono">Answers grounded strictly in document context.</p>
         </div>
       </div>
     </div>

@@ -64,12 +64,28 @@ async def lifespan(app: FastAPI):
             available_models = [m.id for m in models.data]
             logger.info(f"[STARTUP] Groq configured model: {settings.groq_model}")
             if settings.groq_model not in available_models:
-                logger.warning(
-                    f"[STARTUP] Configured Groq model '{settings.groq_model}' is not available "
-                    f"for this API key. Available models: {available_models}. "
-                    "Disabling Groq to prevent 404 errors; defaulting to Gemini fallback."
-                )
-                gateway.groq_api_key = None
+                fallback_candidate = None
+                if getattr(settings, "groq_fallback_model", None) in available_models:
+                    fallback_candidate = settings.groq_fallback_model
+                else:
+                    for candidate in ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
+                        if candidate in available_models:
+                            fallback_candidate = candidate
+                            break
+
+                if fallback_candidate:
+                    logger.warning(
+                        f"[STARTUP] Configured Groq model '{settings.groq_model}' is not available. "
+                        f"Auto-switching Groq model to '{fallback_candidate}'."
+                    )
+                    gateway.groq_model = fallback_candidate
+                else:
+                    logger.warning(
+                        f"[STARTUP] Configured Groq model '{settings.groq_model}' and fallbacks are not available "
+                        f"for this API key. Available models: {available_models}. "
+                        "Disabling Groq to prevent 404 errors; defaulting to Gemini fallback."
+                    )
+                    gateway.groq_api_key = None
             else:
                 logger.info(f"[STARTUP] Groq model '{settings.groq_model}' is available.")
         except Exception as e:

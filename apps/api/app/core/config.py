@@ -75,15 +75,19 @@ class Settings(BaseSettings):
         description="Vision provider: gemini | ollama.",
     )
     gemini_vision_model: str = Field(
-        default="gemini-3.5-flash",
+        default="gemini-3.8-flash",
         description="Gemini model for vision enrichment.",
     )
     groq_model: str = Field(
-        default="qwen/qwen3.6-27b",
+        default="qwen/qwen3.8-27b",
         description="Groq model ID for chat completions.",
     )
+    groq_fallback_model: str = Field(
+        default="openai/gpt-oss-120b",
+        description="Secondary Groq model ID if primary is unavailable.",
+    )
     gemini_chat_model: str = Field(
-        default="gemini-3.5-flash",
+        default="gemini-3.8-flash",
         description="Gemini model ID for chat completions (fallback LLM).",
     )
     gemini_fallback_model: str = Field(
